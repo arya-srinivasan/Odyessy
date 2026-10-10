@@ -1,0 +1,58 @@
+{
+  "SFO": {
+    "city": "San Francisco",
+    "country": "USA",
+    "lat": 37.7749,
+    "lon": -122.4194,
+    "airport": "SFO"
+  },
+  "LAX": {
+    "city": "Los Angeles",
+    "country": "USA",
+    "lat": 34.0522,
+    "lon": -118.2437,
+    "airport": "LAX"
+  },
+  "JFK": {
+    "city": "New York",
+    "country": "USA",
+    "lat": 40.7128,
+    "lon": -74.006,
+    "airport": "JFK"
+  },
+  "BOS": {
+    "city": "Boston",
+    "country": "USA",
+    "lat": 42.3601,
+    "lon": -71.0589,
+    "airport": "BOS"
+  },
+  "HND": {
+    "city": "Tokyo",
+    "country": "Japan",
+    "lat": 35.6762,
+    "lon": 139.6503,
+    "airport": "HND"
+  },
+  "KIX": {
+    "city": "Kyoto",
+    "country": "Japan",
+    "lat": 35.0116,
+    "lon": 135.7681,
+    "airport": "KIX"
+  },
+  "CDG": {
+    "city": "Paris",
+    "country": "France",
+    "lat": 48.8566,
+    "lon": 2.3522,
+    "airport": "CDG"
+  },
+  "LHR": {
+    "city": "London",
+    "country": "UK",
+    "lat": 51.5072,
+    "lon": -0.1276,
+    "airport": "LHR"
+  }
+}

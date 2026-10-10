@@ -1,0 +1,302 @@
+[
+  {
+    "id": "TR001",
+    "from_city": "Tokyo",
+    "to_city": "Kyoto",
+    "operator": "JR Shinkansen Nozomi",
+    "depart_time": "07:00",
+    "duration_hours": 2.25,
+    "price_usd": 105,
+    "co2_kg": 14
+  },
+  {
+    "id": "TR002",
+    "from_city": "Tokyo",
+    "to_city": "Kyoto",
+    "operator": "JR Shinkansen Nozomi",
+    "depart_time": "09:30",
+    "duration_hours": 2.25,
+    "price_usd": 105,
+    "co2_kg": 14
+  },
+  {
+    "id": "TR003",
+    "from_city": "Tokyo",
+    "to_city": "Kyoto",
+    "operator": "JR Shinkansen Nozomi",
+    "depart_time": "12:00",
+    "duration_hours": 2.25,
+    "price_usd": 105,
+    "co2_kg": 14
+  },
+  {
+    "id": "TR004",
+    "from_city": "Tokyo",
+    "to_city": "Kyoto",
+    "operator": "JR Shinkansen Nozomi",
+    "depart_time": "15:30",
+    "duration_hours": 2.25,
+    "price_usd": 105,
+    "co2_kg": 14
+  },
+  {
+    "id": "TR005",
+    "from_city": "Tokyo",
+    "to_city": "Kyoto",
+    "operator": "JR Shinkansen Nozomi",
+    "depart_time": "18:00",
+    "duration_hours": 2.25,
+    "price_usd": 105,
+    "co2_kg": 14
+  },
+  {
+    "id": "TR006",
+    "from_city": "Kyoto",
+    "to_city": "Tokyo",
+    "operator": "JR Shinkansen Nozomi",
+    "depart_time": "08:00",
+    "duration_hours": 2.25,
+    "price_usd": 105,
+    "co2_kg": 14
+  },
+  {
+    "id": "TR007",
+    "from_city": "Kyoto",
+    "to_city": "Tokyo",
+    "operator": "JR Shinkansen Nozomi",
+    "depart_time": "11:00",
+    "duration_hours": 2.25,
+    "price_usd": 105,
+    "co2_kg": 14
+  },
+  {
+    "id": "TR008",
+    "from_city": "Kyoto",
+    "to_city": "Tokyo",
+    "operator": "JR Shinkansen Nozomi",
+    "depart_time": "14:30",
+    "duration_hours": 2.25,
+    "price_usd": 105,
+    "co2_kg": 14
+  },
+  {
+    "id": "TR009",
+    "from_city": "Kyoto",
+    "to_city": "Tokyo",
+    "operator": "JR Shinkansen Nozomi",
+    "depart_time": "17:00",
+    "duration_hours": 2.25,
+    "price_usd": 105,
+    "co2_kg": 14
+  },
+  {
+    "id": "TR010",
+    "from_city": "Kyoto",
+    "to_city": "Tokyo",
+    "operator": "JR Shinkansen Nozomi",
+    "depart_time": "20:00",
+    "duration_hours": 2.25,
+    "price_usd": 105,
+    "co2_kg": 14
+  },
+  {
+    "id": "TR011",
+    "from_city": "Paris",
+    "to_city": "London",
+    "operator": "Eurostar",
+    "depart_time": "07:15",
+    "duration_hours": 2.5,
+    "price_usd": 120,
+    "co2_kg": 15
+  },
+  {
+    "id": "TR012",
+    "from_city": "Paris",
+    "to_city": "London",
+    "operator": "Eurostar",
+    "depart_time": "10:13",
+    "duration_hours": 2.5,
+    "price_usd": 120,
+    "co2_kg": 15
+  },
+  {
+    "id": "TR013",
+    "from_city": "Paris",
+    "to_city": "London",
+    "operator": "Eurostar",
+    "depart_time": "13:31",
+    "duration_hours": 2.5,
+    "price_usd": 120,
+    "co2_kg": 15
+  },
+  {
+    "id": "TR014",
+    "from_city": "Paris",
+    "to_city": "London",
+    "operator": "Eurostar",
+    "depart_time": "17:01",
+    "duration_hours": 2.5,
+    "price_usd": 120,
+    "co2_kg": 15
+  },
+  {
+    "id": "TR015",
+    "from_city": "Paris",
+    "to_city": "London",
+    "operator": "Eurostar",
+    "depart_time": "19:31",
+    "duration_hours": 2.5,
+    "price_usd": 120,
+    "co2_kg": 15
+  },
+  {
+    "id": "TR016",
+    "from_city": "London",
+    "to_city": "Paris",
+    "operator": "Eurostar",
+    "depart_time": "06:50",
+    "duration_hours": 2.5,
+    "price_usd": 120,
+    "co2_kg": 15
+  },
+  {
+    "id": "TR017",
+    "from_city": "London",
+    "to_city": "Paris",
+    "operator": "Eurostar",
+    "depart_time": "09:01",
+    "duration_hours": 2.5,
+    "price_usd": 120,
+    "co2_kg": 15
+  },
+  {
+    "id": "TR018",
+    "from_city": "London",
+    "to_city": "Paris",
+    "operator": "Eurostar",
+    "depart_time": "12:31",
+    "duration_hours": 2.5,
+    "price_usd": 120,
+    "co2_kg": 15
+  },
+  {
+    "id": "TR019",
+    "from_city": "London",
+    "to_city": "Paris",
+    "operator": "Eurostar",
+    "depart_time": "16:01",
+    "duration_hours": 2.5,
+    "price_usd": 120,
+    "co2_kg": 15
+  },
+  {
+    "id": "TR020",
+    "from_city": "London",
+    "to_city": "Paris",
+    "operator": "Eurostar",
+    "depart_time": "19:01",
+    "duration_hours": 2.5,
+    "price_usd": 120,
+    "co2_kg": 15
+  },
+  {
+    "id": "TR021",
+    "from_city": "New York",
+    "to_city": "Boston",
+    "operator": "Amtrak Acela",
+    "depart_time": "06:00",
+    "duration_hours": 3.75,
+    "price_usd": 95,
+    "co2_kg": 22
+  },
+  {
+    "id": "TR022",
+    "from_city": "New York",
+    "to_city": "Boston",
+    "operator": "Amtrak Acela",
+    "depart_time": "09:00",
+    "duration_hours": 3.75,
+    "price_usd": 95,
+    "co2_kg": 22
+  },
+  {
+    "id": "TR023",
+    "from_city": "New York",
+    "to_city": "Boston",
+    "operator": "Amtrak Acela",
+    "depart_time": "12:00",
+    "duration_hours": 3.75,
+    "price_usd": 95,
+    "co2_kg": 22
+  },
+  {
+    "id": "TR024",
+    "from_city": "New York",
+    "to_city": "Boston",
+    "operator": "Amtrak Acela",
+    "depart_time": "15:00",
+    "duration_hours": 3.75,
+    "price_usd": 95,
+    "co2_kg": 22
+  },
+  {
+    "id": "TR025",
+    "from_city": "New York",
+    "to_city": "Boston",
+    "operator": "Amtrak Acela",
+    "depart_time": "18:00",
+    "duration_hours": 3.75,
+    "price_usd": 95,
+    "co2_kg": 22
+  },
+  {
+    "id": "TR026",
+    "from_city": "Boston",
+    "to_city": "New York",
+    "operator": "Amtrak Acela",
+    "depart_time": "07:00",
+    "duration_hours": 3.75,
+    "price_usd": 95,
+    "co2_kg": 22
+  },
+  {
+    "id": "TR027",
+    "from_city": "Boston",
+    "to_city": "New York",
+    "operator": "Amtrak Acela",
+    "depart_time": "10:00",
+    "duration_hours": 3.75,
+    "price_usd": 95,
+    "co2_kg": 22
+  },
+  {
+    "id": "TR028",
+    "from_city": "Boston",
+    "to_city": "New York",
+    "operator": "Amtrak Acela",
+    "depart_time": "13:00",
+    "duration_hours": 3.75,
+    "price_usd": 95,
+    "co2_kg": 22
+  },
+  {
+    "id": "TR029",
+    "from_city": "Boston",
+    "to_city": "New York",
+    "operator": "Amtrak Acela",
+    "depart_time": "16:00",
+    "duration_hours": 3.75,
+    "price_usd": 95,
+    "co2_kg": 22
+  },
+  {
+    "id": "TR030",
+    "from_city": "Boston",
+    "to_city": "New York",
+    "operator": "Amtrak Acela",
+    "depart_time": "19:00",
+    "duration_hours": 3.75,
+    "price_usd": 95,
+    "co2_kg": 22
+  }
+]
