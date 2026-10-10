@@ -1,0 +1,74 @@
+{
+  "Tokyo": [
+    "sunny",
+    "cloudy",
+    "rain",
+    "sunny",
+    "sunny",
+    "cloudy",
+    "rain"
+  ],
+  "Kyoto": [
+    "sunny",
+    "sunny",
+    "cloudy",
+    "rain",
+    "sunny",
+    "cloudy",
+    "sunny"
+  ],
+  "Paris": [
+    "cloudy",
+    "rain",
+    "cloudy",
+    "sunny",
+    "rain",
+    "cloudy",
+    "sunny"
+  ],
+  "London": [
+    "rain",
+    "cloudy",
+    "rain",
+    "cloudy",
+    "sunny",
+    "rain",
+    "cloudy"
+  ],
+  "New York": [
+    "sunny",
+    "sunny",
+    "cloudy",
+    "rain",
+    "sunny",
+    "sunny",
+    "cloudy"
+  ],
+  "Boston": [
+    "cloudy",
+    "sunny",
+    "rain",
+    "sunny",
+    "cloudy",
+    "sunny",
+    "rain"
+  ],
+  "San Francisco": [
+    "cloudy",
+    "sunny",
+    "sunny",
+    "cloudy",
+    "sunny",
+    "sunny",
+    "cloudy"
+  ],
+  "Los Angeles": [
+    "sunny",
+    "sunny",
+    "sunny",
+    "sunny",
+    "sunny",
+    "sunny",
+    "sunny"
+  ]
+}

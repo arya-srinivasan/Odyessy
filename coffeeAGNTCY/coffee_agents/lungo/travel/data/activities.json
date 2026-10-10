@@ -1,0 +1,582 @@
+[
+  {
+    "id": "AC001",
+    "name": "Senso-ji Temple",
+    "city": "Tokyo",
+    "category": "temple",
+    "indoor": false,
+    "duration_hours": 2,
+    "cost_usd": 0,
+    "rating": 4.7
+  },
+  {
+    "id": "AC002",
+    "name": "Meiji Shrine",
+    "city": "Tokyo",
+    "category": "temple",
+    "indoor": false,
+    "duration_hours": 1.5,
+    "cost_usd": 0,
+    "rating": 4.4
+  },
+  {
+    "id": "AC003",
+    "name": "Tsukiji Outer Market food walk",
+    "city": "Tokyo",
+    "category": "food",
+    "indoor": false,
+    "duration_hours": 2,
+    "cost_usd": 40,
+    "rating": 4.4
+  },
+  {
+    "id": "AC004",
+    "name": "Ramen tasting in Shinjuku",
+    "city": "Tokyo",
+    "category": "food",
+    "indoor": true,
+    "duration_hours": 1.5,
+    "cost_usd": 25,
+    "rating": 4.9
+  },
+  {
+    "id": "AC005",
+    "name": "teamLab Planets",
+    "city": "Tokyo",
+    "category": "museum",
+    "indoor": true,
+    "duration_hours": 2,
+    "cost_usd": 30,
+    "rating": 4.7
+  },
+  {
+    "id": "AC006",
+    "name": "Tokyo National Museum",
+    "city": "Tokyo",
+    "category": "museum",
+    "indoor": true,
+    "duration_hours": 2.5,
+    "cost_usd": 10,
+    "rating": 4.8
+  },
+  {
+    "id": "AC007",
+    "name": "Shibuya Crossing & Sky",
+    "city": "Tokyo",
+    "category": "sightseeing",
+    "indoor": false,
+    "duration_hours": 1.5,
+    "cost_usd": 20,
+    "rating": 4.3
+  },
+  {
+    "id": "AC008",
+    "name": "Izakaya hopping in Golden Gai",
+    "city": "Tokyo",
+    "category": "nightlife",
+    "indoor": true,
+    "duration_hours": 3,
+    "cost_usd": 60,
+    "rating": 4.7
+  },
+  {
+    "id": "AC009",
+    "name": "Shinjuku Gyoen garden",
+    "city": "Tokyo",
+    "category": "park",
+    "indoor": false,
+    "duration_hours": 2,
+    "cost_usd": 4,
+    "rating": 4.6
+  },
+  {
+    "id": "AC010",
+    "name": "Akihabara arcades",
+    "city": "Tokyo",
+    "category": "shopping",
+    "indoor": true,
+    "duration_hours": 2,
+    "cost_usd": 20,
+    "rating": 4.5
+  },
+  {
+    "id": "AC011",
+    "name": "Sumo morning practice",
+    "city": "Tokyo",
+    "category": "culture",
+    "indoor": true,
+    "duration_hours": 2,
+    "cost_usd": 50,
+    "rating": 4.7
+  },
+  {
+    "id": "AC012",
+    "name": "Sushi-making class",
+    "city": "Tokyo",
+    "category": "food",
+    "indoor": true,
+    "duration_hours": 2.5,
+    "cost_usd": 90,
+    "rating": 4.7
+  },
+  {
+    "id": "AC013",
+    "name": "Fushimi Inari gates hike",
+    "city": "Kyoto",
+    "category": "temple",
+    "indoor": false,
+    "duration_hours": 3,
+    "cost_usd": 0,
+    "rating": 4.6
+  },
+  {
+    "id": "AC014",
+    "name": "Kinkaku-ji (Golden Pavilion)",
+    "city": "Kyoto",
+    "category": "temple",
+    "indoor": false,
+    "duration_hours": 1.5,
+    "cost_usd": 4,
+    "rating": 4.5
+  },
+  {
+    "id": "AC015",
+    "name": "Arashiyama bamboo grove",
+    "city": "Kyoto",
+    "category": "park",
+    "indoor": false,
+    "duration_hours": 2,
+    "cost_usd": 0,
+    "rating": 4.3
+  },
+  {
+    "id": "AC016",
+    "name": "Nishiki Market tasting",
+    "city": "Kyoto",
+    "category": "food",
+    "indoor": true,
+    "duration_hours": 2,
+    "cost_usd": 30,
+    "rating": 4.3
+  },
+  {
+    "id": "AC017",
+    "name": "Tea ceremony in Gion",
+    "city": "Kyoto",
+    "category": "culture",
+    "indoor": true,
+    "duration_hours": 1.5,
+    "cost_usd": 45,
+    "rating": 4.6
+  },
+  {
+    "id": "AC018",
+    "name": "Kyoto Railway Museum",
+    "city": "Kyoto",
+    "category": "museum",
+    "indoor": true,
+    "duration_hours": 2,
+    "cost_usd": 12,
+    "rating": 4.8
+  },
+  {
+    "id": "AC019",
+    "name": "Kaiseki dinner",
+    "city": "Kyoto",
+    "category": "food",
+    "indoor": true,
+    "duration_hours": 2.5,
+    "cost_usd": 120,
+    "rating": 4.2
+  },
+  {
+    "id": "AC020",
+    "name": "Kiyomizu-dera",
+    "city": "Kyoto",
+    "category": "temple",
+    "indoor": false,
+    "duration_hours": 2,
+    "cost_usd": 4,
+    "rating": 4.5
+  },
+  {
+    "id": "AC021",
+    "name": "Louvre highlights",
+    "city": "Paris",
+    "category": "museum",
+    "indoor": true,
+    "duration_hours": 3,
+    "cost_usd": 22,
+    "rating": 4.5
+  },
+  {
+    "id": "AC022",
+    "name": "Musee d'Orsay",
+    "city": "Paris",
+    "category": "museum",
+    "indoor": true,
+    "duration_hours": 2.5,
+    "cost_usd": 16,
+    "rating": 4.9
+  },
+  {
+    "id": "AC023",
+    "name": "Eiffel Tower summit",
+    "city": "Paris",
+    "category": "sightseeing",
+    "indoor": false,
+    "duration_hours": 2,
+    "cost_usd": 35,
+    "rating": 4.7
+  },
+  {
+    "id": "AC024",
+    "name": "Seine river cruise",
+    "city": "Paris",
+    "category": "sightseeing",
+    "indoor": false,
+    "duration_hours": 1,
+    "cost_usd": 18,
+    "rating": 4.6
+  },
+  {
+    "id": "AC025",
+    "name": "Le Marais food tour",
+    "city": "Paris",
+    "category": "food",
+    "indoor": false,
+    "duration_hours": 3,
+    "cost_usd": 95,
+    "rating": 4.3
+  },
+  {
+    "id": "AC026",
+    "name": "Montmartre walk",
+    "city": "Paris",
+    "category": "sightseeing",
+    "indoor": false,
+    "duration_hours": 2,
+    "cost_usd": 0,
+    "rating": 4.3
+  },
+  {
+    "id": "AC027",
+    "name": "Croissant baking class",
+    "city": "Paris",
+    "category": "food",
+    "indoor": true,
+    "duration_hours": 3,
+    "cost_usd": 110,
+    "rating": 4.3
+  },
+  {
+    "id": "AC028",
+    "name": "Luxembourg Gardens",
+    "city": "Paris",
+    "category": "park",
+    "indoor": false,
+    "duration_hours": 1.5,
+    "cost_usd": 0,
+    "rating": 4.5
+  },
+  {
+    "id": "AC029",
+    "name": "Sainte-Chapelle",
+    "city": "Paris",
+    "category": "culture",
+    "indoor": true,
+    "duration_hours": 1,
+    "cost_usd": 13,
+    "rating": 4.6
+  },
+  {
+    "id": "AC030",
+    "name": "Jazz club in Saint-Germain",
+    "city": "Paris",
+    "category": "nightlife",
+    "indoor": true,
+    "duration_hours": 2.5,
+    "cost_usd": 40,
+    "rating": 4.8
+  },
+  {
+    "id": "AC031",
+    "name": "British Museum",
+    "city": "London",
+    "category": "museum",
+    "indoor": true,
+    "duration_hours": 3,
+    "cost_usd": 0,
+    "rating": 4.3
+  },
+  {
+    "id": "AC032",
+    "name": "Tower of London",
+    "city": "London",
+    "category": "culture",
+    "indoor": true,
+    "duration_hours": 2.5,
+    "cost_usd": 38,
+    "rating": 4.8
+  },
+  {
+    "id": "AC033",
+    "name": "Borough Market food crawl",
+    "city": "London",
+    "category": "food",
+    "indoor": false,
+    "duration_hours": 2,
+    "cost_usd": 45,
+    "rating": 4.8
+  },
+  {
+    "id": "AC034",
+    "name": "Hyde Park walk",
+    "city": "London",
+    "category": "park",
+    "indoor": false,
+    "duration_hours": 1.5,
+    "cost_usd": 0,
+    "rating": 4.8
+  },
+  {
+    "id": "AC035",
+    "name": "West End show",
+    "city": "London",
+    "category": "nightlife",
+    "indoor": true,
+    "duration_hours": 3,
+    "cost_usd": 90,
+    "rating": 4.9
+  },
+  {
+    "id": "AC036",
+    "name": "Tate Modern",
+    "city": "London",
+    "category": "museum",
+    "indoor": true,
+    "duration_hours": 2,
+    "cost_usd": 0,
+    "rating": 4.5
+  },
+  {
+    "id": "AC037",
+    "name": "Thames sunset cruise",
+    "city": "London",
+    "category": "sightseeing",
+    "indoor": false,
+    "duration_hours": 1.5,
+    "cost_usd": 25,
+    "rating": 4.5
+  },
+  {
+    "id": "AC038",
+    "name": "Afternoon tea",
+    "city": "London",
+    "category": "food",
+    "indoor": true,
+    "duration_hours": 2,
+    "cost_usd": 70,
+    "rating": 4.5
+  },
+  {
+    "id": "AC039",
+    "name": "The Met",
+    "city": "New York",
+    "category": "museum",
+    "indoor": true,
+    "duration_hours": 3,
+    "cost_usd": 30,
+    "rating": 4.5
+  },
+  {
+    "id": "AC040",
+    "name": "Central Park bike ride",
+    "city": "New York",
+    "category": "park",
+    "indoor": false,
+    "duration_hours": 2,
+    "cost_usd": 25,
+    "rating": 4.3
+  },
+  {
+    "id": "AC041",
+    "name": "Top of the Rock",
+    "city": "New York",
+    "category": "sightseeing",
+    "indoor": false,
+    "duration_hours": 1,
+    "cost_usd": 40,
+    "rating": 4.4
+  },
+  {
+    "id": "AC042",
+    "name": "Pizza & bagel food tour",
+    "city": "New York",
+    "category": "food",
+    "indoor": false,
+    "duration_hours": 3,
+    "cost_usd": 85,
+    "rating": 4.4
+  },
+  {
+    "id": "AC043",
+    "name": "Broadway show",
+    "city": "New York",
+    "category": "nightlife",
+    "indoor": true,
+    "duration_hours": 3,
+    "cost_usd": 150,
+    "rating": 4.3
+  },
+  {
+    "id": "AC044",
+    "name": "MoMA",
+    "city": "New York",
+    "category": "museum",
+    "indoor": true,
+    "duration_hours": 2.5,
+    "cost_usd": 30,
+    "rating": 4.7
+  },
+  {
+    "id": "AC045",
+    "name": "Brooklyn Bridge walk",
+    "city": "New York",
+    "category": "sightseeing",
+    "indoor": false,
+    "duration_hours": 1.5,
+    "cost_usd": 0,
+    "rating": 4.4
+  },
+  {
+    "id": "AC046",
+    "name": "Chelsea Market tasting",
+    "city": "New York",
+    "category": "food",
+    "indoor": true,
+    "duration_hours": 2,
+    "cost_usd": 35,
+    "rating": 4.3
+  },
+  {
+    "id": "AC047",
+    "name": "Freedom Trail",
+    "city": "Boston",
+    "category": "culture",
+    "indoor": false,
+    "duration_hours": 2.5,
+    "cost_usd": 0,
+    "rating": 4.2
+  },
+  {
+    "id": "AC048",
+    "name": "Museum of Fine Arts",
+    "city": "Boston",
+    "category": "museum",
+    "indoor": true,
+    "duration_hours": 2.5,
+    "cost_usd": 27,
+    "rating": 4.8
+  },
+  {
+    "id": "AC049",
+    "name": "Clam chowder at Quincy Market",
+    "city": "Boston",
+    "category": "food",
+    "indoor": true,
+    "duration_hours": 1,
+    "cost_usd": 20,
+    "rating": 4.5
+  },
+  {
+    "id": "AC050",
+    "name": "Harbor cruise",
+    "city": "Boston",
+    "category": "sightseeing",
+    "indoor": false,
+    "duration_hours": 1.5,
+    "cost_usd": 35,
+    "rating": 4.8
+  },
+  {
+    "id": "AC051",
+    "name": "Golden Gate Bridge walk",
+    "city": "San Francisco",
+    "category": "sightseeing",
+    "indoor": false,
+    "duration_hours": 2,
+    "cost_usd": 0,
+    "rating": 4.7
+  },
+  {
+    "id": "AC052",
+    "name": "Ferry Building food stalls",
+    "city": "San Francisco",
+    "category": "food",
+    "indoor": true,
+    "duration_hours": 1.5,
+    "cost_usd": 30,
+    "rating": 4.5
+  },
+  {
+    "id": "AC053",
+    "name": "Exploratorium",
+    "city": "San Francisco",
+    "category": "museum",
+    "indoor": true,
+    "duration_hours": 2.5,
+    "cost_usd": 40,
+    "rating": 4.6
+  },
+  {
+    "id": "AC054",
+    "name": "Alcatraz tour",
+    "city": "San Francisco",
+    "category": "culture",
+    "indoor": false,
+    "duration_hours": 3,
+    "cost_usd": 45,
+    "rating": 4.8
+  },
+  {
+    "id": "AC055",
+    "name": "Getty Center",
+    "city": "Los Angeles",
+    "category": "museum",
+    "indoor": true,
+    "duration_hours": 3,
+    "cost_usd": 0,
+    "rating": 4.2
+  },
+  {
+    "id": "AC056",
+    "name": "Santa Monica Pier",
+    "city": "Los Angeles",
+    "category": "sightseeing",
+    "indoor": false,
+    "duration_hours": 2,
+    "cost_usd": 0,
+    "rating": 4.4
+  },
+  {
+    "id": "AC057",
+    "name": "Taco crawl in Boyle Heights",
+    "city": "Los Angeles",
+    "category": "food",
+    "indoor": false,
+    "duration_hours": 2.5,
+    "cost_usd": 35,
+    "rating": 4.3
+  },
+  {
+    "id": "AC058",
+    "name": "Griffith Observatory",
+    "city": "Los Angeles",
+    "category": "sightseeing",
+    "indoor": false,
+    "duration_hours": 2,
+    "cost_usd": 0,
+    "rating": 4.9
+  }
+]
