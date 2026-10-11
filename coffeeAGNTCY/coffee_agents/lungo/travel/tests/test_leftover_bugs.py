@@ -78,3 +78,32 @@ def test_trains_says_when_there_is_no_train():
 def test_email_is_branded_odyssey():
     r = chat("SFO to Tokyo Nov 12 to 16")
     assert r["email"]["subject"].startswith("Your Odyssey trip")
+
+
+# --- Rail vs flights: book one way of getting there, not both ---
+
+def test_direct_rail_replaces_flights():
+    r = chat("London to Paris, Nov 12 to 14")
+    assert r["plan"]["flight"] is None
+    assert r["plan"]["train"]["operator"] == "Eurostar" and r["plan"]["train"]["return"]
+    assert r["costs"]["train"] == 240 and r["warnings"] == ""
+
+
+def test_tight_budget_swaps_rail_for_flights():
+    r = chat("London to Paris, Nov 12 to 14, budget 400")
+    assert r["plan"]["train"] is None and r["plan"]["flight"]["outbound"]
+
+
+def test_rain_keeps_the_train_without_a_flight_warning():
+    async def go():
+        transport = httpx.ASGITransport(app=main.app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://gateway") as client:
+            await client.post("/chat", json={"session_id": "s1", "message": "Tokyo to Kyoto, Nov 12 to 14"})
+            return (await client.post("/event", json={"session_id": "s1", "type": "rain", "day": 1})).json()
+    r = asyncio.run(go())
+    assert r["plan"]["train"] and r["plan"]["flight"] is None and r["warnings"] == ""
+
+
+def test_trip_email_lists_both_trains():
+    r = chat("London to Paris, Nov 12 to 14")
+    assert r["email"]["text"].count("Train: Eurostar") == 2

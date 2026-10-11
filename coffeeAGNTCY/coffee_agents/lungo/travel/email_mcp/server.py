@@ -57,9 +57,12 @@ def plan_events(plan: Plan, request: TripRequest) -> list[dict]:
             "where": f"{h['area']}, {h['city']}",
         })
 
-    if plan.train:
-        t = plan.train
-        day = dates[min(1, len(dates)-1)]
+    for i, t in enumerate(plan.train_legs()):
+        # A round trip leaves on the first day and comes home on the last day.
+        if plan.train.get("return"):
+            day = dates[0] if i == 0 else dates[-1]
+        else:
+            day = dates[min(1, len(dates)-1)]
         start = _at(day, t["depart_time"])
         events.append({
             "title": f"Train {t['operator']}: {t['from_city']} to {t['to_city']}",
@@ -113,8 +116,7 @@ def render_text(plan: Plan, request: TripRequest) -> str:
             stops = "nonstop" if not f.get("stops") else f"{f['stops']} stop"
             lines.append(f"{label} flight: {f['airline']} {f['flight_no']}, departs {f['depart_time']}, "
                          f"{f['duration_hours']}h {stops}, ${f['price_usd']:,}")
-    if plan.train:
-        t = plan.train
+    for t in plan.train_legs():
         lines.append(f"Train: {t['operator']} {t['from_city']} to {t['to_city']} at {t['depart_time']}, ${t['price_usd']:,}")
     if plan.hotel:
         h = plan.hotel

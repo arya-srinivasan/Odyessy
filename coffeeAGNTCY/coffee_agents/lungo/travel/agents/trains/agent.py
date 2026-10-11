@@ -20,9 +20,12 @@ class TrainsAgent(Negotiator):
         return any(line.sender == self.name for line in msg.history)
 
     def _options(self, msg) -> list[dict]:
-        if not msg.request.origin or not msg.request.destination:
+        """Rail only counts if it runs both ways; otherwise the traveler still needs a flight home."""
+        r = msg.request
+        if not r.origin or not r.destination:
             return []
-        return search_trains(msg.request.origin, msg.request.destination)
+        out, back = search_trains(r.origin, r.destination), search_trains(r.destination, r.origin)
+        return [{**out[0], "return": back[0]}] if out and back else []
 
     def decide(self, msg):
         """On my first turn, say what I booked (or that no train connects the two cities)."""
@@ -31,7 +34,10 @@ class TrainsAgent(Negotiator):
             if not options:
                 r = msg.request
                 return "ACCEPT", None, f"no train connects {r.origin} and {r.destination}, so flights it is"
-            return "CHANGE", self.propose(msg), f"booked {options[0]['operator']} from {options[0]['from_city']} to {options[0]['to_city']}"
+            t = options[0]
+            if msg.plan.train and msg.plan.train.get("id") == t["id"]:
+                return "ACCEPT", None, f"keeping {t['operator']} both ways"   # a re-run (rain, new travelers): nothing to change
+            return "CHANGE", self.propose(msg), f"booked {t['operator']} both ways between {t['from_city']} and {t['to_city']}, so no flights needed"
         return super().decide(msg)
 
     def propose(self, msg) -> Plan:
@@ -40,6 +46,7 @@ class TrainsAgent(Negotiator):
         options = self._options(msg)
         if options:
             p.train = options[0]
+            p.flight = None   # rail replaces the flights; Flights books again if rail is dropped
         else:
             p.train = None
         return p
@@ -62,5 +69,5 @@ class TrainsAgent(Negotiator):
             p = msg.plan.model_copy(deep=True)
             dropped_id = p.train.get("id", "rail")
             p.train = None
-            return p, f"dropped train leg {dropped_id} to reduce overall budget"
+            return p, f"dropped train {dropped_id} to save money; Flights can book instead"
         return None

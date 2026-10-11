@@ -153,7 +153,7 @@ def final_warnings(msg: ChannelMsg) -> str:
     r, p, who = msg.request, msg.plan, set(msg.participants)
     warnings = [w for w in [budget_note(msg)] if w]
     f = p.flight or {}
-    if "Flights" in who and r.origin and r.destination:
+    if "Flights" in who and r.origin and r.destination and not p.train:   # a booked train covers the trip
         missing = [leg for leg in ("outbound", "return") if not f.get(leg)]
         if missing:
             warnings.append(f"no {' or '.join(missing)} flight available between {r.origin} and {r.destination}")

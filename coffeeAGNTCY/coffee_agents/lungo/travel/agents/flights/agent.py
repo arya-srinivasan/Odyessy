@@ -15,7 +15,8 @@ class FlightsAgent(Negotiator):
     concession = 0.15
 
     def has_my_part(self, msg):
-        return msg.plan.flight is not None
+        # A booked train covers the journey, so there is nothing for me to add.
+        return msg.plan.flight is not None or msg.plan.train is not None
 
     def _search(self, frm, to, msg):
         if not frm or not to:
@@ -36,7 +37,9 @@ class FlightsAgent(Negotiator):
     def _fastest_possible(self, msg) -> float:
         return _hours(self.propose(msg).flight)
 
-    def satisfaction(self, msg): 
+    def satisfaction(self, msg):
+        if msg.plan.train is not None:
+            return 1.0   # rail covers the trip; I step aside
         current, fastest = _hours(msg.plan.flight), self._fastest_possible(msg)
         if not fastest:
             return 1.0   # no flights exist for this route: nothing better I could book

@@ -379,6 +379,8 @@ function showTerminus(log) {
 
 // --- trip ---
 const money = (n) => "$" + Math.round(n).toLocaleString();
+// Show the year only when the trip isn't this year, e.g. ", 2027".
+const yearNote = (iso) => (iso.slice(0, 4) === String(new Date().getFullYear()) ? "" : `, ${iso.slice(0, 4)}`);
 const fmtDate = (iso) => new Date(iso + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" });
 
 function el(tag, cls, text) {
@@ -399,7 +401,7 @@ function showPlan(plan, request) {
   left.append(el("h2", null, request.destination || "Your trip"));
   const days = plan.days || [];
   if (days.length) left.append(el("div", "dates",
-      `${fmtDate(days[0].date)} to ${fmtDate(days[days.length - 1].date)}, ${days.length} days` + (travelers > 1 ? `, ${travelers} travelers` : "")));
+      `${fmtDate(days[0].date)} to ${fmtDate(days[days.length - 1].date)}${yearNote(days[days.length - 1].date)}, ${days.length} days` + (travelers > 1 ? `, ${travelers} travelers` : "")));
   hero.append(left);
 
   const total = current?.total ?? planTotal(plan, travelers);
@@ -429,8 +431,8 @@ function showPlan(plan, request) {
       `${f.outbound.origin} to ${f.outbound.destination}, ${f.outbound.depart_time}, ${f.outbound.duration_hours}h`, f.outbound.price_usd * travelers));
   if (f.return) legs.append(leg("Flight home", `${f.return.airline} ${f.return.flight_no}`,
       `${f.return.origin} to ${f.return.destination}, ${f.return.depart_time}, ${f.return.duration_hours}h`, f.return.price_usd * travelers));
-  if (plan.train) legs.append(leg("Train", plan.train.operator,
-      `${plan.train.from_city} to ${plan.train.to_city}`, plan.train.price_usd * travelers));
+  trainLegs(plan).forEach((t, i) => legs.append(leg(i === 0 ? "Train out" : "Train home", t.operator,
+      `${t.from_city} to ${t.to_city}, ${t.depart_time}, ${t.duration_hours}h`, t.price_usd * travelers)));
   if (plan.hotel) legs.append(leg("Hotel", plan.hotel.name,
       `${plan.hotel.area}, rated ${plan.hotel.rating}, ${plan.hotel.nights} nights`, plan.hotel.price_per_night_usd * plan.hotel.nights));
   box.append(legs);
@@ -463,12 +465,15 @@ function leg(kind, what, detail, price) {
 }
 
 // Same math as Plan.total() in models.py: hotel per room, everything else per person.
+// The outbound train, plus the return train when there is one.
+const trainLegs = (plan) => plan.train ? [plan.train, plan.train.return].filter(Boolean) : [];
+
 function planTotal(plan, travelers) {
   let per = 0;
   const f = plan.flight || {};
   if (f.outbound) per += f.outbound.price_usd;
   if (f.return) per += f.return.price_usd;
-  if (plan.train) per += plan.train.price_usd;
+  trainLegs(plan).forEach((t) => (per += t.price_usd));
   (plan.days || []).forEach((d) => d.activities.forEach((a) => (per += a.cost_usd)));
   const hotel = plan.hotel ? plan.hotel.price_per_night_usd * (plan.hotel.nights || 1) : 0;
   return per * travelers + hotel;

@@ -152,7 +152,7 @@ class Plan(BaseModel):
             for leg in ("outbound", "return"):
                 if self.flight.get(leg):
                     flight += self.flight[leg]["price_usd"]
-        train = self.train["price_usd"] if self.train else 0.0
+        train = sum(t["price_usd"] for t in self.train_legs())
         hotel = self.hotel["price_per_night_usd"] * self.hotel.get("nights", 1) if self.hotel else 0.0
         acts = sum(a["cost_usd"] for d in self.days for a in d.get("activities", []))
         # Hotel is per room (two travelers share); transport and activities are per person.
@@ -172,9 +172,14 @@ class Plan(BaseModel):
             for leg in ("outbound", "return"):
                 if self.flight.get(leg):
                     co2 += self.flight[leg].get("co2_kg", 0)
-        if self.train:
-            co2 += self.train.get("co2_kg", 0)
+        co2 += sum(t.get("co2_kg", 0) for t in self.train_legs())
         return co2
+
+    def train_legs(self) -> list[dict]:
+        """The outbound train, plus the return train if Trains booked one."""
+        if not self.train:
+            return []
+        return [self.train] + ([self.train["return"]] if self.train.get("return") else [])
 
     def summary(self, travelers: int = 1) -> str:
         parts = []
