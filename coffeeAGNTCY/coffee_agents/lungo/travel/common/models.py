@@ -53,6 +53,9 @@ class TripRequest(BaseModel):
     travelers: int = 1
     budget_usd: float | None = None
     interests: list[str] = Field(default_factory=list)  # e.g. ["food", "temples"]
+    avoid: list[str] = Field(default_factory=list)  # activity categories to skip, e.g. ["museum"]
+    must_do: list[str] = Field(default_factory=list)  # activity names to include, e.g. ["Louvre highlights"]
+    activities_per_day: int | None = None  # pace: 1 (relaxed) to 3 (packed); None = 2
     hotel_area: str | None = None  # e.g. "Shibuya"
 
     # Constraints and events (Level 2 "changing conditions")
@@ -67,6 +70,14 @@ class TripRequest(BaseModel):
             return max(1, int(v))
         except (TypeError, ValueError):
             return 1
+
+    @field_validator("activities_per_day", mode="before")
+    @classmethod
+    def _sensible_pace(cls, v):
+        try:
+            return min(3, max(1, int(v))) if v is not None else None
+        except (TypeError, ValueError):
+            return None
 
     @field_validator("budget_usd", mode="before")
     @classmethod

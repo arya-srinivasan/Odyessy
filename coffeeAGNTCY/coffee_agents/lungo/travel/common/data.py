@@ -6,6 +6,7 @@ search and utility functions.
 
 from datetime import date, timedelta
 import json
+import re
 from pathlib import Path
 from typing import Any
 
@@ -68,10 +69,12 @@ def resolve_city(text: str) -> dict[str, Any] | None:
         if query == info["city"].lower():
             return dict(info)
 
-    # 3. Substring match (e.g. "Tokyo, Japan" -> "Tokyo")
+    # 3. Whole-word partial match ("New York City" -> New York, "york" -> New York), never
+    #    a fragment like "le" (which is inside "Los Angeles")
     for info in CITIES.values():
         city_lower = info["city"].lower()
-        if city_lower in query or query in city_lower:
+        if re.search(rf"\b{re.escape(city_lower)}\b", query) or (
+                len(query) >= 4 and re.search(rf"\b{re.escape(query)}\b", city_lower)):
             return dict(info)
 
     return None
@@ -166,8 +169,15 @@ def search_hotels(
     return results
 
 
-def cheaper_hotels(hotel: dict[str, Any], min_rating: float) -> list[dict[str, Any]]:
-    """Return cheaper alternatives in the same city meeting min_rating (smallest downgrade first)."""
+def hotel_areas(city: str | None = None) -> dict[str, str]:
+    """Neighborhoods with hotels: {area: city}, for one city or all of them."""
+    record = resolve_city(city) if city else None
+    return {h["area"]: h["city"] for h in HOTELS if not city or (record and h["city"] == record["city"])}
+
+
+def cheaper_hotels(hotel: dict[str, Any], min_rating: float, area: str | None = None) -> list[dict[str, Any]]:
+    """Return cheaper alternatives in the same city meeting min_rating (smallest downgrade first).
+    With an area, only hotels there, unless the area has no cheaper one at all."""
     city = hotel["city"]
     current_price = hotel["price_per_night_usd"]
     nights = hotel.get("nights", 1)
@@ -179,6 +189,9 @@ def cheaper_hotels(hotel: dict[str, Any], min_rating: float) -> list[dict[str, A
         and h["price_per_night_usd"] < current_price
         and h["rating"] >= min_rating
     ]
+    if area:
+        in_area = [h for h in matching if h["area"].lower() == area.strip().lower()]
+        matching = in_area or matching
 
     # Smallest price downgrade first
     matching.sort(key=lambda x: x["price_per_night_usd"], reverse=True)

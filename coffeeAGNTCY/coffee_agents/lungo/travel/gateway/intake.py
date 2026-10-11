@@ -6,7 +6,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from travel.common.data import CITIES, COUNTRY_ALIASES, resolve_city
+from travel.common.data import CITIES, COUNTRY_ALIASES, hotel_areas, resolve_city
 from travel.common.llm import llm_structured
 from travel.common.models import MAX_TRIP_NIGHTS, TripRequest
 
@@ -20,24 +20,40 @@ Extract any travel parameters mentioned:
 - return_date (YYYY-MM-DD format)
 - travelers (number of people going, including the user; "me and my wife" is 2)
 - budget_usd (total budget for the whole group, as a number)
-- interests (list of strings like ["food", "museum", "temple", "culture", "sightseeing"])
+- interests (categories they want more of, from: food, museum, sightseeing, culture, temple, park, nightlife, shopping)
+- avoid (categories from the same list they don't want, e.g. "no museums" -> ["museum"])
+- activities_per_day (1 for a relaxed pace, 3 for packed, 2 for normal; only if they mention pace)
 - hotel_area (a neighborhood to stay in, e.g. "Shibuya")
+
+Never invent a city, flight, hotel or activity. Write places exactly as the traveler named them.
 
 Only populate fields that are explicitly mentioned or clearly implied. Leave others null or empty.
 """
 
 INTEREST_WORDS = {
-    "food": ["food", "eat", "restaurant", "sushi", "ramen", "cuisine"],
-    "museum": ["museum", "art", "gallery"],
-    "sightseeing": ["sightseeing", "sights", "landmark"],
-    "culture": ["culture", "cultural", "history", "historic"],
+    "food": ["food", "foodie", "eat", "eating", "restaurant", "sushi", "ramen", "cuisine", "cooking", "tasting"],
+    "museum": ["museum", "art", "gallery", "galleries", "exhibit"],
+    "sightseeing": ["sightseeing", "sights", "landmark", "views", "view", "skyline", "beach", "beaches", "cruise"],
+    "culture": ["culture", "cultural", "history", "historic", "historical", "tradition", "traditional"],
     "temple": ["temple", "shrine"],
-    "park": ["park", "garden", "nature", "outdoors"],
-    "nightlife": ["nightlife", "bar", "club", "jazz"],
-    "shopping": ["shopping", "shop", "market"],
+    "park": ["park", "garden", "nature", "outdoors", "outdoor", "hiking", "hike", "walking"],
+    "nightlife": ["nightlife", "bar", "club", "jazz", "drinks", "show", "theater", "theatre"],
+    "shopping": ["shopping", "shop", "market", "arcade", "anime", "games", "gaming"],
 }
+NEGATION = (r"\b(?:no|not into|not a fan of|not big on|don'?t (?:like|love|want|care for|enjoy)|do not like|"
+            r"skip(?:ping)?|avoid|hate|without|not interested in|nothing|none of the|less|fewer|tired of)\s+"
+            r"(?:any\s+|the\s+|more\s+|big\s+)?")
 NUMBER_WORDS = {"one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6,
                 "seven": 7, "eight": 8, "nine": 9, "ten": 10}
+MONTH_WORDS = {"jan", "january", "feb", "february", "mar", "march", "apr", "april", "may", "jun", "june",
+               "jul", "july", "aug", "august", "sep", "sept", "september", "oct", "october", "nov",
+               "november", "dec", "december"}
+
+
+def _is_month(word: str) -> bool:
+    return word.lower().strip(".,!?") in MONTH_WORDS
+
+
 CITY_ALIASES = {"NYC": "New York", "LA": "Los Angeles", "SF": "San Francisco"}  # matched in CAPS only
 MONTHS = {"jan": 1, "feb": 2, "mar": 3, "apr": 4, "may": 5, "jun": 6,
           "jul": 7, "aug": 8, "sep": 9, "oct": 10, "nov": 11, "dec": 12}
@@ -54,6 +70,8 @@ class IntakeFields(BaseModel):
     travelers: int | None = None
     budget_usd: float | None = None
     interests: list[str] = Field(default_factory=list)
+    avoid: list[str] = Field(default_factory=list)
+    activities_per_day: int | None = None
     hotel_area: str | None = None
 
 
@@ -170,6 +188,33 @@ def _relative_dates(lower: str, today: date) -> tuple[date | None, date | None]:
     return depart, ret
 
 
+# Words in activity names too generic to name one place ("Museum", "Market", "walk")
+GENERIC_NAME_WORDS = {"museum", "market", "temple", "tower", "garden", "gardens", "park", "walk", "tour", "class",
+                      "show", "cruise", "tasting", "food", "highlights", "summit", "bridge", "crawl", "dinner",
+                      "ceremony", "practice", "morning", "sunset", "river", "trail", "center", "pier", "hike",
+                      "gates", "grove", "stalls", "station", "making", "baking", "hopping", "crossing", "afternoon",
+                      "london", "tokyo", "kyoto", "paris", "boston", "york", "brooklyn", "shinjuku", "gion",
+                      "shibuya", "arashiyama", "saint-germain", "quincy", "chelsea", "golden", "building", "pizza",
+                      "bagel", "jazz", "club", "ferry", "fine", "arts", "national", "railway", "west", "end"}
+
+
+def _must_sees(lower: str) -> list[tuple[str, str]]:
+    """Activities named in the text: [(activity name, city)]. A name counts by its full name
+    or one of its own distinctive words ("Louvre", "teamLab", "Alcatraz", "Senso-ji")."""
+    from travel.common.data import ACTIVITIES
+    # A neighborhood or city on its own ("stay in Montmartre") is a place, not an activity.
+    place_words = {w for name in [*hotel_areas(), *(c["city"] for c in CITIES.values())]
+                   for w in name.lower().split()}
+    found = []
+    for a in ACTIVITIES:
+        name = a["name"].lower()
+        words = {w.strip("()&,'") for w in name.split()} - GENERIC_NAME_WORDS - place_words
+        keys = {name} | {w for w in words if len(w) >= 4}
+        if any(re.search(rf"(?<![\w-]){re.escape(k)}(?![\w-])", lower) for k in keys):
+            found.append((a["name"], a["city"]))
+    return found
+
+
 def _extract_travelers(lower: str) -> int | None:
     num = r"(\d+|" + "|".join(NUMBER_WORDS) + r")"
     for pattern in (rf"\b{num}\s+(?:travel+ers?|people|persons|adults|guests|friends|of us)\b",
@@ -210,7 +255,7 @@ def _trim_place(raw: str, capitalized: bool = True) -> str | None:
     """Cut a captured place down to its name: stop at a month, a lowercase word or a filler word."""
     words = []
     for w in raw.split():
-        if w.lower()[:3] in MONTHS or w.lower() in GREETINGS or w.lower() in {"for", "on", "in", "with", "from", "to", "and"}:
+        if _is_month(w) or w.lower() in GREETINGS or w.lower() in {"for", "on", "in", "with", "from", "to", "and"}:
             break
         if capitalized and not w[0].isupper():
             break
@@ -261,7 +306,7 @@ def _extract_places(text: str) -> tuple[str | None, str | None, list[str]]:
         for m in re.finditer(rf"\b(?:from|to)\s+({WORD})|^\s*({WORD})(?=\s+(?:to|-)\s)", lower):
             start = m.start(1) if m.group(1) else m.start(2)
             word = m.group(1) or m.group(2)
-            if any(p <= start < e for p, e, *_ in mentions) or word in NOT_PLACES or word[:3] in MONTHS:
+            if any(p <= start < e for p, e, *_ in mentions) or word in NOT_PLACES or _is_month(word):
                 continue
             if not resolve_city(word):
                 mentions.append((start, start + len(word), word.title(), word.title(), False))
@@ -323,6 +368,15 @@ def _heuristic_extract(text: str, today: date | None = None) -> dict[str, Any]:
     if ret:
         updates["return_date"] = ret
 
+    # Where to stay: any neighborhood we have hotels in, plus whatever follows "stay in".
+    areas = [(area, city) for area, city in hotel_areas().items()
+             if re.search(rf"(?<![\w']){re.escape(area.lower())}(?![\w'])", lower)]
+    if areas:
+        updates["_areas"] = areas
+    stay = re.search(rf"\bstay(?:ing)?\s+(?:somewhere\s+)?(?:in|near|around|at|close to|by)\s+(?:the\s+)?({PLACE})", text)
+    if stay and (place := _trim_place(stay.group(1), capitalized=False)):
+        updates["_stay_place"] = place
+
     if (budget := _extract_budget(lower)) is not None:
         updates["budget_usd"] = budget
     if (travelers := _extract_travelers(lower)) is not None:
@@ -333,10 +387,33 @@ def _heuristic_extract(text: str, today: date | None = None) -> dict[str, Any]:
         if joining:
             updates["_extra_travelers"] = len(joining)
 
+    # Likes and dislikes: "no museums", "not into nightlife" are things to skip, not interests.
+    # A must-see's own name doesn't count ("British Museum" isn't a wish for more museums).
+    must = _must_sees(lower)
+    for name, _ in must:
+        lower = lower.replace(name.lower(), " ")
+        for word in name.lower().split():
+            if word not in GENERIC_NAME_WORDS and len(word) >= 4:
+                lower = re.sub(rf"(?<![\w-]){re.escape(word)}(?![\w-])\s*(?:\w+)?", " ", lower)
+    avoid = [k for k, words in INTEREST_WORDS.items()
+             if any(re.search(NEGATION + rf"{w}s?\b", lower) for w in words)]
     interests = [k for k, words in INTEREST_WORDS.items()
-                 if any(re.search(rf"\b{w}s?\b", lower) for w in words)]
+                 if k not in avoid and any(re.search(rf"\b{w}s?\b", lower) for w in words)]
     if interests:
         updates["interests"] = interests
+    if avoid:
+        updates["avoid"] = avoid
+    if must:
+        updates["_must_sees"] = must
+
+    if re.search(r"\b(?:relax(?:ed|ing)?|slow|chill|easy|laid[- ]back|low[- ]key)\b(?:\s+\w+)?\s*(?:pace|trip|days?)?"
+                 r"|\b(?:one|1) (?:thing|activity|activities)(?: a| per) day\b", lower):
+        updates["activities_per_day"] = 1
+    elif re.search(r"\b(?:packed|busy|action[- ]packed|lots to do|as much as (?:possible|we can)|jam[- ]packed)\b"
+                   r"|\b(?:three|3) (?:things|activities)(?: a| per) day\b", lower):
+        updates["activities_per_day"] = 3
+    elif re.search(r"\b(?:two|2) (?:things|activities)(?: a| per) day\b|\bnormal pace\b", lower):
+        updates["activities_per_day"] = 2
     return updates
 
 
@@ -376,6 +453,54 @@ def question_for(missing: list[str]) -> str:
     return f"To get started, could you tell me {', '.join(parts[:-1])}, and {parts[-1]}?"
 
 
+def _choose_must_sees(data: dict, must_sees: list[tuple[str, str]]) -> str:
+    """Add named activities in the trip's city to data['must_do']; note the ones elsewhere."""
+    if not must_sees:
+        return ""
+    dest = resolve_city(data.get("destination") or "")
+    here = [name for name, city in must_sees if not dest or city == dest["city"]]
+    data["must_do"] = sorted(set(data.get("must_do") or []) | set(here))
+    away = [(name, city) for name, city in must_sees if dest and city != dest["city"]]
+    if away:
+        return "; ".join(f"{name} is in {city}, not {dest['city']}" for name, city in away) + "."
+    return ""
+
+
+def _choose_area(data: dict, areas: list[tuple[str, str]], stay: str | None, others: list[str]) -> str:
+    """Set data['hotel_area'] from what the traveler asked for; return a note when it can't be used."""
+    if not areas and not stay:
+        return ""
+    dest = resolve_city(data.get("destination") or "")
+    if dest:
+        here = [a for a, city in areas if city == dest["city"]]
+        if here:
+            data["hotel_area"] = here[0]
+            return ""
+        if data.get("hotel_area") and hotel_areas(dest["city"]).get(data["hotel_area"]) is None:
+            data["hotel_area"] = None          # left over from another city
+    elif areas and stay:
+        data["hotel_area"] = areas[0][0]       # no destination yet; checked again once there is one
+        return ""
+    known_here = ", ".join(hotel_areas(dest["city"])) if dest else ""
+    # Another city's neighborhood counts only when it's where they asked to stay ("stay in Le Marais"),
+    # not a stray word that happens to share a name ("our mission is fun").
+    elsewhere = [(a, city) for a, city in areas
+                 if (not dest or city != dest["city"]) and stay and stay.lower().startswith(a.lower())]
+    if elsewhere and dest:
+        a, city = elsewhere[0]
+        return f"{a} is in {city}, not {dest['city']}, so I picked the best area in {dest['city']} ({known_here})."
+    if stay and dest:
+        city = resolve_city(stay)
+        if city and city["city"] == dest["city"]:
+            return ""                          # "stay in Tokyo" on a Tokyo trip
+        if city and city["city"] in others:
+            return ""                          # already told: one destination at a time
+        if city:
+            return f"I plan one city per trip, so you'll stay in {dest['city']}."
+        return f"I don't have hotels listed in {stay}; the areas I know in {dest['city']} are {known_here}."
+    return ""
+
+
 def date_note(depart: str | None, ret: str | None) -> str:
     """Why a pair of dates the traveler gave can't be used ('' when they're fine)."""
     try:
@@ -411,11 +536,13 @@ async def update_request_with_note(current: TripRequest, user_message: str) -> t
 
     updated_data = current.model_dump()
 
+    # The rule-based reading always runs: it finds the neighborhoods, must-sees and places we
+    # have no data for. The LLM, when on, fills in or overrides the plain fields on top.
+    extracted_data = _heuristic_extract(user_message)
     if extracted:
-        extracted_data = extracted.model_dump(exclude_none=True)
-    else:
-        # Fall back to regex/heuristic extraction
-        extracted_data = _heuristic_extract(user_message)
+        for key, value in extracted.model_dump(exclude_none=True).items():
+            if value not in ("", [], 0):
+                extracted_data[key] = value
 
     notes = []
     lower = user_message.lower()
@@ -440,6 +567,9 @@ async def update_request_with_note(current: TripRequest, user_message: str) -> t
         updated_data = current.model_dump()
 
     others = extracted_data.pop("_other_destinations", [])
+    areas = extracted_data.pop("_areas", [])
+    must_sees = extracted_data.pop("_must_sees", [])
+    stay = extracted_data.pop("_stay_place", None)
     extra = extracted_data.pop("_extra_travelers", 0)
     if extra and "travelers" not in extracted_data:
         extracted_data["travelers"] = current.travelers + extra   # "my wife is coming too"
@@ -460,13 +590,19 @@ async def update_request_with_note(current: TripRequest, user_message: str) -> t
 
     for key, value in extracted_data.items():
         if value is not None and value != "" and value != []:
-            if key == "interests":
-                existing = set(updated_data.get("interests") or [])
+            if key in ("interests", "avoid"):
+                existing = set(updated_data.get(key) or [])
                 existing.update(value)
-                updated_data["interests"] = sorted(existing)
+                updated_data[key] = sorted(existing)
             else:
                 updated_data[key] = value
 
+    if extracted_data.get("avoid"):   # a newly disliked category stops being an interest
+        updated_data["interests"] = [i for i in updated_data["interests"] if i not in extracted_data["avoid"]]
+    if extracted_data.get("interests"):   # and a newly liked one stops being avoided
+        updated_data["avoid"] = [a for a in updated_data["avoid"] if a not in extracted_data["interests"]]
+    notes.append(_choose_must_sees(updated_data, must_sees))
+    notes.append(_choose_area(updated_data, areas, stay, others))
     notes.append(date_note(updated_data.get("depart_date"), updated_data.get("return_date")))
     if others:
         notes.append(f"I can plan one destination at a time, so this plan is for {updated_data['destination']}; "

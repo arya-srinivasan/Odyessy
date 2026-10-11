@@ -109,7 +109,9 @@ async def _negotiate(session: dict[str, Any]) -> dict[str, Any]:
         "costs": final.plan.costs(request.travelers),
         "total_usd": final.plan.total(request.travelers),
         "note": final.note,
-        "warnings": "; ".join(w for w in (final_warnings(final), _offline_warning(final.participants)) if w),
+        "warnings": "; ".join(w for w in (final_warnings(final), _offline_warning(final.participants),
+                                           _area_warning(final), _must_do_warning(final)) if w),
+        "understood": _understood(request),
         "offline_agents": [name for name in TURN_ORDER if name not in final.participants],
         "agents": final.participants,
         "mode": mode,
@@ -136,6 +138,45 @@ def _date_problems(request: TripRequest) -> list[str]:
     if request.depart_date and date.fromisoformat(request.depart_date) < date.today():
         return [f"Your departure date ({request.depart_date}) is in the past. When would you like to leave?"]
     return []
+
+
+def _understood(r: TripRequest) -> str:
+    """The preferences this plan follows, in one line, so nothing the traveler said is silently dropped."""
+    parts = []
+    if r.travelers > 1:
+        parts.append(f"{r.travelers} travelers")
+    if r.budget_usd:
+        parts.append(f"${r.budget_usd:,.0f} budget")
+    if r.hotel_area:
+        parts.append(f"staying in {r.hotel_area}")
+    if r.must_do:
+        parts.append("must-see: " + ", ".join(r.must_do))
+    plural = {"museum": "museums", "temple": "temples", "park": "parks"}
+    if r.interests:
+        parts.append("more " + ", ".join(plural.get(i, i) for i in r.interests))
+    if r.avoid:
+        parts.append("no " + ", ".join(plural.get(a, a) for a in r.avoid))
+    if r.activities_per_day:
+        parts.append({1: "relaxed: 1 activity a day", 2: "2 activities a day",
+                      3: "packed: up to 3 activities a day"}[r.activities_per_day])
+    return ("Planned for: " + "; ".join(parts) + ".") if parts else ""
+
+
+def _must_do_warning(final: ChannelMsg) -> str:
+    planned = {a["name"] for d in final.plan.days for a in d["activities"]}
+    missing = [m for m in final.request.must_do if m not in planned]
+    if not missing:
+        return ""
+    return ("Couldn't fit " + ", ".join(missing) +
+            " (an outdoor activity needs a dry day, and there are only so many slots a day)")
+
+
+def _area_warning(final: ChannelMsg) -> str:
+    """The traveler asked for a neighborhood and the hotel isn't in it (only to meet the budget)."""
+    area, hotel = final.request.hotel_area, final.plan.hotel
+    if area and hotel and hotel["area"].lower() != area.lower():
+        return f"No hotel in {area} fit the budget, so you're staying in {hotel['area']} ({hotel['name']})"
+    return ""
 
 
 OWNS = {"Weather": "no forecast", "Flights": "no flights booked", "Trains": "no train options",
@@ -191,7 +232,8 @@ async def handle_chat(payload: ChatPayload):
 
         # 3. All required fields are present: execute the multi-agent negotiation
         result = await _negotiate(session)
-        return {"status": "complete", **({"message": date_issue} if date_issue else {}), **result}
+        message = " ".join(m for m in (date_issue, result["understood"]) if m)
+        return {"status": "complete", **({"message": message} if message else {}), **result}
 
 
 @app.post("/event")
