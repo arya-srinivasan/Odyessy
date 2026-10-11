@@ -16,7 +16,8 @@ async def run_local(request: TripRequest, agents: list, plan: Plan | None = None
 def default_agents() -> list:
     from travel.agents.hotels.agent import HotelsAgent
     from travel.agents.budget.agent import BudgetAgent
-    return [HotelsAgent(), BudgetAgent()]
+    from travel.agents.weather.agent import WeatherAgent
+    return [HotelsAgent(), BudgetAgent(), WeatherAgent()]
 
 if __name__ == "__main__":
     req = TripRequest(origin="SFO", destination="Tokyo", depart_date="2026-11-12", return_date="2026-11-16", budget_usd=600, interests=["food"])
