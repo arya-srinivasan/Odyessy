@@ -24,6 +24,16 @@ class TrainsAgent(Negotiator):
             return []
         return search_trains(msg.request.origin, msg.request.destination)
 
+    def decide(self, msg):
+        """On my first turn, say what I booked (or that no train connects the two cities)."""
+        if not self.has_my_part(msg):
+            options = self._options(msg)
+            if not options:
+                r = msg.request
+                return "ACCEPT", None, f"no train connects {r.origin} and {r.destination}, so flights it is"
+            return "CHANGE", self.propose(msg), f"booked {options[0]['operator']} from {options[0]['from_city']} to {options[0]['to_city']}"
+        return super().decide(msg)
+
     def propose(self, msg) -> Plan:
         """Find direct train route or scenic day trips from destination."""
         p = msg.plan.model_copy(deep=True)

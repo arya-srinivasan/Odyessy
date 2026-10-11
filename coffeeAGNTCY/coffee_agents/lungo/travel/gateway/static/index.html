@@ -120,6 +120,9 @@
   .bubble.you { align-self: flex-end; background: var(--brand); color: #fff; border-bottom-right-radius: 3px; }
   .bubble.app { align-self: flex-start; background: var(--soft); border-bottom-left-radius: 3px; }
   .chat form { display: flex; gap: 8px; }
+  .chat-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 14px; }
+  .chat-head h2 { margin: 0; }
+  .btn.small { padding: 5px 10px; font-size: 13px; }
   .examples { margin-top: 8px; color: var(--muted); font-size: 13px; }
   .examples button { background: none; border: 0; padding: 0; color: var(--brand); cursor: pointer; text-decoration: underline; font-size: 13px; }
 
@@ -176,7 +179,10 @@
   </section>
 
   <section class="chat" aria-labelledby="chat-h">
-    <h2 id="chat-h">Plan a trip</h2>
+    <div class="chat-head">
+      <h2 id="chat-h">Plan a trip</h2>
+      <button type="button" class="btn small" id="new-trip">New trip</button>
+    </div>
     <div class="messages" id="messages" aria-live="polite"></div>
     <form id="chat-form">
       <label for="chat-input" class="sr-only">Your message</label>
@@ -213,6 +219,7 @@ const $ = (id) => document.getElementById(id);
 let current = null;   // last plan + request from the Gateway
 let busy = false;
 let seen = 0;   // how many log lines we have already shown
+const WELCOME = document.getElementById("plan").innerHTML;   // the empty-state card, kept for "New trip"
 
 function sessionId() {
   try {
@@ -257,6 +264,26 @@ function say(who, text) {
   $("messages").scrollTop = $("messages").scrollHeight;
 }
 
+// Start over: a fresh session id means the Gateway forgets the old trip.
+function newTrip() {
+  if (busy) return;
+  const id = crypto.randomUUID();
+  try { localStorage.setItem("odyssey_session", id); } catch { window.__sid = id; }
+  current = null;
+  seen = 0;
+  $("plan").innerHTML = WELCOME;
+  $("actions").hidden = true;
+  $("email-result").textContent = "";
+  $("route").innerHTML = "";
+  $("terminus").innerHTML = "";
+  $("route-empty").hidden = false;
+  $("via").textContent = "";
+  $("messages").innerHTML = "";
+  notice("");
+  say("app", "Fresh start. Where do you want to go?");
+  $("chat-input").focus();
+}
+
 function setBusy(on, label) {
   busy = on;
   for (const id of ["send", "rain", "cancel", "email"]) $(id).disabled = on;
@@ -268,6 +295,8 @@ function setBusy(on, label) {
 
 function handle(reply) {
   if (reply.status === "needs_info") { say("app", reply.message); return; }
+  // A finished plan can still carry a note, like "I moved your dates to next year".
+  if (reply.message) say("app", reply.message);
   if (reply.plan) {
     current = { plan: reply.plan, request: reply.request || current?.request || {}, total: reply.total_usd, warnings: toList(reply.warnings) };
     // The Gateway sends every negotiation so far; show only the one that just ran.
@@ -466,6 +495,7 @@ $("chat-form").addEventListener("submit", (e) => {
 document.querySelectorAll("[data-example]").forEach((b) =>
   b.addEventListener("click", () => { $("chat-input").value = b.dataset.example; $("chat-input").focus(); }));
 
+$("new-trip").addEventListener("click", newTrip);
 $("rain").addEventListener("click", () => {
   say("you", "It's going to rain on day 2.");
   run("Rain on day 2. The agents are re-planning…", () => post("/event", { type: "rain", day: 1 }));

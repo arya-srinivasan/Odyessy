@@ -43,6 +43,11 @@ INTEREST_WORDS = {
 NEGATION = (r"\b(?:no|not into|not a fan of|not big on|don'?t (?:like|love|want|care for|enjoy)|do not like|"
             r"skip(?:ping)?|avoid|hate|without|not interested in|nothing|none of the|less|fewer|tired of)\s+"
             r"(?:any\s+|the\s+|more\s+|big\s+)?")
+# Things travelers ask for that no city in our data offers: said out loud instead of dropped.
+UNSUPPORTED_INTERESTS = {"ski": "skiing", "skiing": "skiing", "snowboarding": "snowboarding",
+                         "scuba": "diving", "diving": "diving", "safari": "safaris",
+                         "casino": "casinos", "theme park": "theme parks"}
+MAX_TRAVELERS = 9
 NUMBER_WORDS = {"one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6,
                 "seven": 7, "eight": 8, "nine": 9, "ten": 10}
 MONTH_WORDS = {"jan", "january", "feb", "february", "mar", "march", "apr", "april", "may", "jun", "june",
@@ -514,6 +519,35 @@ def date_note(depart: str | None, ret: str | None) -> str:
     return ""
 
 
+def _extra_notes(extracted: dict, updated: dict, current: TripRequest, message: str) -> list[str]:
+    """Things the traveler asked for that we changed or couldn't do, said out loud (edits updated in place)."""
+    notes, lower, today = [], message.lower(), date.today()
+
+    # A date that already passed this year was moved to next year: say so.
+    depart = extracted.get("depart_date")
+    if depart and depart != current.depart_date:
+        d = date.fromisoformat(depart)
+        if d.year > today.year and d.replace(year=today.year) < today:
+            notes.append(f"{d:%b} {d.day} has already passed this year, so I planned it for {d.year}.")
+
+    # Budgets of $0 or less can't be planned for.
+    if (extracted.get("budget_usd") is not None and extracted["budget_usd"] <= 0) or \
+            re.search(r"\bbudget\D{0,10}-\s*\$?\d", lower):
+        updated["budget_usd"] = current.budget_usd
+        notes.append("A budget has to be more than $0, so I planned without that one.")
+
+    # Groups bigger than we plan for.
+    if (updated.get("travelers") or 1) > MAX_TRAVELERS:
+        updated["travelers"] = current.travelers
+        notes.append(f"I can plan for up to {MAX_TRAVELERS} travelers, so I kept it at {current.travelers}.")
+
+    # Interests we have nothing for.
+    unsupported = sorted({label for word, label in UNSUPPORTED_INTERESTS.items() if re.search(rf"\b{word}\b", lower)})
+    if unsupported:
+        notes.append(f"I don't have {' or '.join(unsupported)} yet, so I picked the best-rated activities instead.")
+    return notes
+
+
 async def update_request(current: TripRequest, user_message: str) -> TripRequest:
     """Extract trip parameters from user message and merge non-empty fields into current."""
     return (await update_request_with_note(current, user_message))[0]
@@ -603,6 +637,7 @@ async def update_request_with_note(current: TripRequest, user_message: str) -> t
         updated_data["avoid"] = [a for a in updated_data["avoid"] if a not in extracted_data["interests"]]
     notes.append(_choose_must_sees(updated_data, must_sees))
     notes.append(_choose_area(updated_data, areas, stay, others))
+    notes += _extra_notes(extracted_data, updated_data, current, user_message)
     notes.append(date_note(updated_data.get("depart_date"), updated_data.get("return_date")))
     if others:
         notes.append(f"I can plan one destination at a time, so this plan is for {updated_data['destination']}; "

@@ -501,26 +501,86 @@
   },
   {
     "id": "AC051",
+    "name": "Isabella Stewart Gardner Museum",
+    "city": "Boston",
+    "category": "museum",
+    "indoor": true,
+    "duration_hours": 2,
+    "cost_usd": 22,
+    "rating": 4.7
+  },
+  {
+    "id": "AC052",
+    "name": "Fenway Park tour",
+    "city": "Boston",
+    "category": "sightseeing",
+    "indoor": false,
+    "duration_hours": 1.5,
+    "cost_usd": 25,
+    "rating": 4.5
+  },
+  {
+    "id": "AC053",
+    "name": "North End cannoli crawl",
+    "city": "Boston",
+    "category": "food",
+    "indoor": false,
+    "duration_hours": 2,
+    "cost_usd": 30,
+    "rating": 4.6
+  },
+  {
+    "id": "AC054",
+    "name": "Boston Public Library",
+    "city": "Boston",
+    "category": "culture",
+    "indoor": true,
+    "duration_hours": 1.5,
+    "cost_usd": 0,
+    "rating": 4.8
+  },
+  {
+    "id": "AC055",
+    "name": "New England Aquarium",
+    "city": "Boston",
+    "category": "museum",
+    "indoor": true,
+    "duration_hours": 2,
+    "cost_usd": 33,
+    "rating": 4.2
+  },
+  {
+    "id": "AC056",
+    "name": "Jazz at Wally's Cafe",
+    "city": "Boston",
+    "category": "nightlife",
+    "indoor": true,
+    "duration_hours": 2,
+    "cost_usd": 15,
+    "rating": 4.4
+  },
+  {
+    "id": "AC057",
     "name": "Golden Gate Bridge walk",
     "city": "San Francisco",
     "category": "sightseeing",
     "indoor": false,
     "duration_hours": 2,
     "cost_usd": 0,
-    "rating": 4.7
+    "rating": 4.3
   },
   {
-    "id": "AC052",
+    "id": "AC058",
     "name": "Ferry Building food stalls",
     "city": "San Francisco",
     "category": "food",
     "indoor": true,
     "duration_hours": 1.5,
     "cost_usd": 30,
-    "rating": 4.5
+    "rating": 4.9
   },
   {
-    "id": "AC053",
+    "id": "AC059",
     "name": "Exploratorium",
     "city": "San Francisco",
     "category": "museum",
@@ -530,17 +590,77 @@
     "rating": 4.6
   },
   {
-    "id": "AC054",
+    "id": "AC060",
     "name": "Alcatraz tour",
     "city": "San Francisco",
     "category": "culture",
     "indoor": false,
     "duration_hours": 3,
     "cost_usd": 45,
-    "rating": 4.8
+    "rating": 4.5
   },
   {
-    "id": "AC055",
+    "id": "AC061",
+    "name": "Baker Beach",
+    "city": "San Francisco",
+    "category": "sightseeing",
+    "indoor": false,
+    "duration_hours": 2,
+    "cost_usd": 0,
+    "rating": 4.7
+  },
+  {
+    "id": "AC062",
+    "name": "Mission burrito crawl",
+    "city": "San Francisco",
+    "category": "food",
+    "indoor": false,
+    "duration_hours": 2,
+    "cost_usd": 25,
+    "rating": 4.4
+  },
+  {
+    "id": "AC063",
+    "name": "SFMOMA",
+    "city": "San Francisco",
+    "category": "museum",
+    "indoor": true,
+    "duration_hours": 2.5,
+    "cost_usd": 30,
+    "rating": 4.3
+  },
+  {
+    "id": "AC064",
+    "name": "Chinatown walk",
+    "city": "San Francisco",
+    "category": "culture",
+    "indoor": false,
+    "duration_hours": 1.5,
+    "cost_usd": 0,
+    "rating": 4.4
+  },
+  {
+    "id": "AC065",
+    "name": "California Academy of Sciences",
+    "city": "San Francisco",
+    "category": "museum",
+    "indoor": true,
+    "duration_hours": 2.5,
+    "cost_usd": 40,
+    "rating": 4.6
+  },
+  {
+    "id": "AC066",
+    "name": "Jazz at SFJAZZ",
+    "city": "San Francisco",
+    "category": "nightlife",
+    "indoor": true,
+    "duration_hours": 2,
+    "cost_usd": 45,
+    "rating": 4.6
+  },
+  {
+    "id": "AC067",
     "name": "Getty Center",
     "city": "Los Angeles",
     "category": "museum",
@@ -550,33 +670,93 @@
     "rating": 4.2
   },
   {
-    "id": "AC056",
+    "id": "AC068",
     "name": "Santa Monica Pier",
     "city": "Los Angeles",
     "category": "sightseeing",
     "indoor": false,
     "duration_hours": 2,
     "cost_usd": 0,
-    "rating": 4.4
+    "rating": 4.8
   },
   {
-    "id": "AC057",
+    "id": "AC069",
     "name": "Taco crawl in Boyle Heights",
     "city": "Los Angeles",
     "category": "food",
     "indoor": false,
     "duration_hours": 2.5,
     "cost_usd": 35,
-    "rating": 4.3
+    "rating": 4.5
   },
   {
-    "id": "AC058",
+    "id": "AC070",
     "name": "Griffith Observatory",
     "city": "Los Angeles",
     "category": "sightseeing",
     "indoor": false,
     "duration_hours": 2,
     "cost_usd": 0,
-    "rating": 4.9
+    "rating": 4.6
+  },
+  {
+    "id": "AC071",
+    "name": "Venice Beach",
+    "city": "Los Angeles",
+    "category": "sightseeing",
+    "indoor": false,
+    "duration_hours": 2,
+    "cost_usd": 0,
+    "rating": 4.6
+  },
+  {
+    "id": "AC072",
+    "name": "The Broad",
+    "city": "Los Angeles",
+    "category": "museum",
+    "indoor": true,
+    "duration_hours": 2,
+    "cost_usd": 0,
+    "rating": 4.6
+  },
+  {
+    "id": "AC073",
+    "name": "Grand Central Market",
+    "city": "Los Angeles",
+    "category": "food",
+    "indoor": true,
+    "duration_hours": 1.5,
+    "cost_usd": 25,
+    "rating": 4.7
+  },
+  {
+    "id": "AC074",
+    "name": "Hollywood Bowl concert",
+    "city": "Los Angeles",
+    "category": "nightlife",
+    "indoor": false,
+    "duration_hours": 3,
+    "cost_usd": 60,
+    "rating": 4.4
+  },
+  {
+    "id": "AC075",
+    "name": "Natural History Museum",
+    "city": "Los Angeles",
+    "category": "museum",
+    "indoor": true,
+    "duration_hours": 2.5,
+    "cost_usd": 18,
+    "rating": 4.2
+  },
+  {
+    "id": "AC076",
+    "name": "Malibu beach drive",
+    "city": "Los Angeles",
+    "category": "sightseeing",
+    "indoor": false,
+    "duration_hours": 3,
+    "cost_usd": 10,
+    "rating": 4.4
   }
 ]

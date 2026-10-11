@@ -90,14 +90,23 @@ ACTIVITIES = {
     "Boston": [
         ("Freedom Trail", "culture", False, 2.5, 0), ("Museum of Fine Arts", "museum", True, 2.5, 27),
         ("Clam chowder at Quincy Market", "food", True, 1, 20), ("Harbor cruise", "sightseeing", False, 1.5, 35),
+        ("Isabella Stewart Gardner Museum", "museum", True, 2, 22), ("Fenway Park tour", "sightseeing", False, 1.5, 25),
+        ("North End cannoli crawl", "food", False, 2, 30), ("Boston Public Library", "culture", True, 1.5, 0),
+        ("New England Aquarium", "museum", True, 2, 33), ("Jazz at Wally's Cafe", "nightlife", True, 2, 15),
     ],
     "San Francisco": [
         ("Golden Gate Bridge walk", "sightseeing", False, 2, 0), ("Ferry Building food stalls", "food", True, 1.5, 30),
         ("Exploratorium", "museum", True, 2.5, 40), ("Alcatraz tour", "culture", False, 3, 45),
+        ("Baker Beach", "sightseeing", False, 2, 0), ("Mission burrito crawl", "food", False, 2, 25),
+        ("SFMOMA", "museum", True, 2.5, 30), ("Chinatown walk", "culture", False, 1.5, 0),
+        ("California Academy of Sciences", "museum", True, 2.5, 40), ("Jazz at SFJAZZ", "nightlife", True, 2, 45),
     ],
     "Los Angeles": [
         ("Getty Center", "museum", True, 3, 0), ("Santa Monica Pier", "sightseeing", False, 2, 0),
         ("Taco crawl in Boyle Heights", "food", False, 2.5, 35), ("Griffith Observatory", "sightseeing", False, 2, 0),
+        ("Venice Beach", "sightseeing", False, 2, 0), ("The Broad", "museum", True, 2, 0),
+        ("Grand Central Market", "food", True, 1.5, 25), ("Hollywood Bowl concert", "nightlife", False, 3, 60),
+        ("Natural History Museum", "museum", True, 2.5, 18), ("Malibu beach drive", "sightseeing", False, 3, 10),
     ],
 }
 

@@ -88,7 +88,7 @@ def _ics_text(s: str) -> str:
 def to_ics(events: list[dict]) -> str:
     """A minimal iCalendar file any calendar app can import. Times are local (floating)."""
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//TravelAgntcy//EN", "CALSCALE:GREGORIAN"]
+    lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Odyssey//EN", "CALSCALE:GREGORIAN"]
     for i, e in enumerate(events):
         lines += ["BEGIN:VEVENT", f"UID:travelagntcy-{stamp}-{i}@travelagntcy", f"DTSTAMP:{stamp}"]
         if e["all_day"]:
@@ -135,7 +135,7 @@ def render_text(plan: Plan, request: TripRequest) -> str:
         budget += f" (${over:,.0f} OVER budget: no cheaper option was found)"
     people = f" for {request.travelers} travelers" if request.travelers > 1 else ""
     lines += ["", f"Total: ${total:,.0f}{people}{budget}",
-              "Planned by six TravelAgntcy agents who negotiated it among themselves.",
+              "Planned by six Odyssey agents who negotiated it among themselves.",
               "Use Add to calendar on the trip page to put every flight, the hotel and each activity in your calendar."]
     return "\n".join(lines)
  
@@ -145,7 +145,7 @@ def compose(to: str, plan: Plan, request: TripRequest) -> dict:
     if the MCP server isn't reachable."""
     text = render_text(plan, request)
     body = text if len(text) <= MAX_BODY_CHARS else text[:MAX_BODY_CHARS] + "\n..."
-    subject = f"Your TravelAgntcy trip to {request.destination or 'your destination'}"
+    subject = f"Your Odyssey trip to {request.destination or 'your destination'}"
     mailto = f"mailto:{quote(to or '', safe='@')}?subject={quote(subject)}&body={quote(body)}"
     return {"mailto": mailto, "ics": to_ics(plan_events(plan, request)), "text": text, "subject": subject}
  
