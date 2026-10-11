@@ -1,4 +1,3 @@
-import asyncio
 import logging
 from uuid import uuid4
 
@@ -13,7 +12,7 @@ from agntcy_app_sdk.semantic.a2a.server.experimental_patterns import A2AExperime
 from config.config import OTEL_SDK_DISABLED
 
 from travel.common.models import ChannelMsg
-from travel.common.protocol import apply_move
+from travel.common.negotiator import take_turn
 
 log = logging.getLogger("travel.a2a_server")
 
@@ -47,11 +46,7 @@ class TurnExecutor(AgentExecutor):
         msg = ChannelMsg.from_text(incoming)
         if msg is None or msg.type == "FINAL" or msg.next != self.agent.name:
             return SILENT  # not my turn
-        try:
-            out = await asyncio.wait_for(self.agent.on_turn(msg), TURN_TIMEOUT)
-        except Exception:
-            log.exception("%s failed on its turn; passing", self.agent.name)
-            out = apply_move(msg, self.agent.name, "OBJECT", "I hit an error and am skipping this turn")
+        out = await take_turn(self.agent, msg, TURN_TIMEOUT)
         return out.to_text()
 
     async def execute(self, context: RequestContext, event_queue: EventQueue):

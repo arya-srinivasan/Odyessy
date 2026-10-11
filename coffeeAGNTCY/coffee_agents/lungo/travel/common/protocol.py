@@ -81,6 +81,34 @@ def apply_move(msg: ChannelMsg, sender: str, move: str, note: str,
         out = ranked_vote(out)
     return out
 
+def drop_participant(msg: ChannelMsg, name: str, reason: str = "stopped responding") -> ChannelMsg:
+    """Take an agent off the channel mid-negotiation (e.g. its process died) and carry on:
+       the plan, history, votes and round are kept; if it was its turn, the next agent speaks."""
+    if name not in msg.participants:
+        return msg
+    out = msg.model_copy(deep=True)
+    out.type = "MOVE"
+    if out.next == name:
+        out.next, wrapped = next_speaker(name, out.participants)
+        if wrapped:
+            out.round += 1
+    out.participants = [p for p in out.participants if p != name]
+    out.accepts = [a for a in out.accepts if a != name]
+    out.objections.pop(name, None)
+    out.sender, out.move = "Gateway", ""
+    out.note = f"{name} {reason}; continuing without it"
+    out.history.append(LogLine(round=out.round, sender="Gateway", move="", version=out.plan.version, note=out.note))
+    if not out.participants:
+        out.type, out.next = "FINAL", ""
+    elif is_consensus(out):
+        out.type, out.next = "FINAL", ""
+        if warn := final_warnings(out):
+            out.note += f" ({warn})"
+    elif out.round >= MAX_ROUNDS:
+        out = ranked_vote(out)
+    return out
+
+
 def is_consensus(msg: ChannelMsg) -> bool:
     """set(msg.accepts) == set(msg.participants)."""
     return set(msg.accepts) == set(msg.participants)

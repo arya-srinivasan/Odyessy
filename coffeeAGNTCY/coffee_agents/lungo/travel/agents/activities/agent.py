@@ -29,26 +29,26 @@ class ActivitiesAgent(Negotiator):
         return True
 
     def propose(self, msg) -> Plan:
-        """Pick 2 activities per day: outdoor + indoor on dry days, 2 indoor on rainy days."""
+        """Pick up to 2 activities per day: outdoor + indoor on dry days, 2 indoor on rainy days.
+        Every day gets its first activity before any day gets a second, so a long trip or a
+        city with few activities is spread out instead of front-loaded."""
         interests = [i.lower().removesuffix("s") for i in msg.request.interests]
         unused = self._catalog(msg, interests)  # best first
         dates = trip_days(msg.request.depart_date, msg.request.return_date)
 
         # Fill rainy days first: they can only use indoor activities, so they get first pick.
         order = sorted(range(len(dates)), key=lambda d: self._is_dry(msg, d))
-        picks_by_day = {}
-        for d in order:
-            dry = self._is_dry(msg, d)
-            wanted = [False, True] if dry else [True, True]  # indoor? for each slot
-            picks = []
-            for want_indoor in wanted:
+        picks_by_day = {d: [] for d in order}
+        for slot in range(2):
+            for d in order:
+                dry = self._is_dry(msg, d)
+                want_indoor = slot == 1 or not dry  # dry days: outdoor first, then indoor
                 match = next((a for a in unused if a["indoor"] == want_indoor), None)
                 if match is None and dry:
                     match = next(iter(unused), None)  # dry day: any type is fine
                 if match:
-                    picks.append(match)
+                    picks_by_day[d].append(match)
                     unused.remove(match)
-            picks_by_day[d] = picks
 
         p = msg.plan.model_copy(deep=True)
         p.days = [{"day": d, "date": dates[d], "activities": picks_by_day[d]}

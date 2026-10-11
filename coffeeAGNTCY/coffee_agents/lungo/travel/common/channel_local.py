@@ -1,6 +1,7 @@
 import asyncio 
 from travel.common.models import ChannelMsg, Plan, TripRequest
-from travel.common.protocol import start_message
+from travel.common.negotiator import take_turn
+from travel.common.protocol import drop_participant, start_message
 from travel.common.data import request_problems
 
 async def run_local(request: TripRequest, agents: list, plan: Plan | None = None, verbose= True) -> ChannelMsg:
@@ -8,13 +9,22 @@ async def run_local(request: TripRequest, agents: list, plan: Plan | None = None
     if problems:
         raise ValueError(" ".join(problems))  # stop at the door, before any agent runs
     msg = start_message(request, [a.name for a in agents], plan)
-    by_name = {a.name : a for a in agents}
+    return await resume_local(msg, agents, verbose)
+
+
+async def resume_local(msg: ChannelMsg, agents: list, verbose: bool = True) -> ChannelMsg:
+    """Play the negotiation to the end in-process, from any point (a fresh start, or
+    where a SLIM channel broke off). Participants with no agent here are dropped."""
+    by_name = {a.name: a for a in agents}
+    for name in [p for p in msg.participants if p not in by_name]:
+        msg = drop_participant(msg, name, "isn't available")
     while msg.type != "FINAL":
-        msg = await by_name[msg.next].on_turn(msg)
+        msg = await take_turn(by_name[msg.next], msg)
         if verbose:                                   # <- inside the loop
             l = msg.history[-1]
             print(f"[r{l.round}] {l.sender:<10} {l.move:<7} v{l.version}  {l.note}")
-    print("FINAL:", msg.plan.summary(msg.request.travelers))
+    if verbose:
+        print("FINAL:", msg.plan.summary(msg.request.travelers))
     return msg
 
 def default_agents() -> list:

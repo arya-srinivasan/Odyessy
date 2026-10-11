@@ -1,5 +1,8 @@
 from typing import TypedDict
 from langgraph.graph import StateGraph, END
+import asyncio
+import logging
+
 from travel.common.protocol import apply_move
 from travel.common.llm import llm_text
 from travel.common.models import ChannelMsg, Plan
@@ -72,4 +75,13 @@ class Negotiator:
 
     async def on_turn(self, msg: ChannelMsg) -> ChannelMsg:
         return (await self.graph.ainvoke({"msg": msg}))["out"]
-    
+
+
+async def take_turn(agent: "Negotiator", msg: ChannelMsg, timeout: float = 60) -> ChannelMsg:
+    """One turn that can't take the channel down: if the agent crashes or hangs,
+    it objects with a plain note instead, and the negotiation moves on."""
+    try:
+        return await asyncio.wait_for(agent.on_turn(msg), timeout)
+    except Exception:
+        logging.getLogger("travel.negotiator").exception("%s failed on its turn; passing", agent.name)
+        return apply_move(msg, agent.name, "OBJECT", "I hit an error and am skipping this turn")
