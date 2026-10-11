@@ -164,7 +164,9 @@ async def handle_chat(payload: ChatPayload):
             session["email"] = payload.email
 
         # 1. Update the structured request with information from user's message
-        session["request"], date_issue = await update_request_with_note(session["request"], payload.message)
+        session["request"], date_issue, new_trip = await update_request_with_note(session["request"], payload.message)
+        if new_trip:
+            session["plan"], session["log"] = None, []   # plan the new trip from scratch
 
         # 2. Check for missing essential parameters, then for things we can't plan
         missing = find_missing(session["request"])

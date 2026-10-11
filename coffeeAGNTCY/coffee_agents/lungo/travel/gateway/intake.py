@@ -394,9 +394,10 @@ async def update_request(current: TripRequest, user_message: str) -> TripRequest
     return (await update_request_with_note(current, user_message))[0]
 
 
-async def update_request_with_note(current: TripRequest, user_message: str) -> tuple[TripRequest, str]:
+async def update_request_with_note(current: TripRequest, user_message: str) -> tuple[TripRequest, str, bool]:
     """update_request, plus a note on anything the traveler said that couldn't be used as
-    given (dates that end before they start, a trip that is too long, a second destination)."""
+    given (dates that end before they start, a trip that is too long, a second destination),
+    and whether the message started a new trip rather than changing the current one."""
     messages = [
         {"role": "system", "content": INTAKE_SYSTEM_PROMPT.format(today=date.today().isoformat())},
         {"role": "user", "content": user_message},
@@ -417,6 +418,27 @@ async def update_request_with_note(current: TripRequest, user_message: str) -> t
         extracted_data = _heuristic_extract(user_message)
 
     notes = []
+    lower = user_message.lower()
+    changing = re.search(r"\b(?:actually|instead|change|switch|rather|make it|let'?s do|how about|what about)\b", lower)
+
+    # A full route restated after a trip was already set up ("SFO to Paris Dec 1 to 5") is a
+    # new trip: nothing from the last one (budget, travelers, interests, rain, cancellations)
+    # carries over. Edits ("actually Paris instead", "keep it under $1,500") still change this one.
+    new_trip = bool(
+        re.search(r"\b(?:new|another|next|different) trip\b", lower)
+        or (current.origin and current.destination and not changing
+            and extracted_data.get("origin") and extracted_data.get("destination")))
+    if new_trip and current != TripRequest():
+        carried = []
+        if current.budget_usd and "budget_usd" not in extracted_data:
+            carried.append(f"the ${current.budget_usd:,.0f} budget")
+        if current.travelers > 1 and "travelers" not in extracted_data:
+            carried.append(f"{current.travelers} travelers")
+        if carried:
+            notes.append(f"New trip, so I didn't carry over {' or '.join(carried)} from the last one.")
+        current = TripRequest()
+        updated_data = current.model_dump()
+
     others = extracted_data.pop("_other_destinations", [])
     extra = extracted_data.pop("_extra_travelers", 0)
     if extra and "travelers" not in extracted_data:
@@ -425,10 +447,8 @@ async def update_request_with_note(current: TripRequest, user_message: str) -> t
     # Answering "where are you departing from?" with just a city: that's the origin, not a new
     # destination, unless they say they're changing it ("actually Paris", "make it London").
     new_dest = extracted_data.get("destination")
-    changing = re.search(r"\b(?:actually|instead|change|switch|rather|make it|let'?s do|how about|what about)\b|\bto\b",
-                         user_message.lower())
     if (new_dest and not extracted_data.get("origin") and current.destination and not current.origin
-            and new_dest != current.destination and not changing):
+            and new_dest != current.destination and not changing and not re.search(r"\bto\b", lower)):
         known = resolve_city(new_dest)
         extracted_data["origin"] = known["airport"] if known else new_dest
         del extracted_data["destination"]
@@ -451,4 +471,4 @@ async def update_request_with_note(current: TripRequest, user_message: str) -> t
     if others:
         notes.append(f"I can plan one destination at a time, so this plan is for {updated_data['destination']}; "
                      f"ask me about {' and '.join(others)} next.")
-    return TripRequest(**updated_data), " ".join(n for n in notes if n)
+    return TripRequest(**updated_data), " ".join(n for n in notes if n), new_trip

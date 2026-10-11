@@ -286,3 +286,48 @@ def test_relative_dates(text, depart, ret):
 def test_lowercase_routes(text, origin, destination):
     got = _heuristic_extract(text, today=date(2026, 10, 10))
     assert (got.get("origin"), got.get("destination")) == (origin, destination)
+
+
+# --- A new trip in the same session starts clean ---
+
+def test_new_trip_does_not_inherit_the_last_budget_or_travelers():
+    first, second = chat_turns(
+        "Me and my wife want to go from SFO to Tokyo Nov 12 to 16, budget $3,000, we love temples",
+        "SFO to Paris Dec 1 to 5")
+    assert first["request"]["budget_usd"] == 3000 and first["request"]["travelers"] == 2
+    req = second["request"]
+    assert (req["budget_usd"], req["travelers"], req["interests"]) == (None, 1, [])
+    assert "didn't carry over the $3,000 budget or 2 travelers" in second["message"]
+    assert "OVER BUDGET" not in second["warnings"]
+    assert all(line["version"] <= second["plan"]["version"] for line in second["log"])   # fresh log
+
+
+def test_same_route_restated_is_a_new_trip_too():
+    _, second = chat_turns("SFO to Tokyo Nov 12 to 16, budget $2000", "SFO to Tokyo Dec 1 to 5")
+    assert second["request"]["budget_usd"] is None
+
+
+def test_new_trip_forgets_rain_and_cancellations():
+    (first,) = chat_turns("SFO to Tokyo Nov 12 to 16, $9000")
+    booked = first["plan"]["flight"]["outbound"]["id"]
+    call(("/event", {"session_id": "c", "type": "rain", "day": 0}),
+         ("/event", {"session_id": "c", "type": "cancel", "flight_id": booked}))
+    (second,) = chat_turns("SFO to Tokyo Dec 1 to 5")
+    assert second["request"]["rain_days"] == [] and second["request"]["cancelled_flights"] == []
+
+
+@pytest.mark.parametrize("edit", [
+    "actually, let's do Paris instead",
+    "can we do Nov 20 to 24 instead",
+    "I'm flying from LA now",
+    "make it 2 people",
+])
+def test_edits_keep_the_budget(edit):
+    _, second = chat_turns("SFO to Tokyo Nov 12 to 16, budget $5,000", edit)
+    assert second["request"]["budget_usd"] == 5000
+
+
+def test_saying_new_trip_starts_over():
+    _, second = chat_turns("SFO to Tokyo Nov 12 to 16, budget $5,000", "new trip: to Paris")
+    assert second["request"]["budget_usd"] is None
+    assert second["request"]["destination"] == "Paris" and second["request"]["origin"] is None
