@@ -19,7 +19,8 @@ def default_agents() -> list:
     from travel.agents.flights.agent import FlightsAgent
     from travel.agents.weather.agent import WeatherAgent
     from travel.agents.trains.agent import TrainsAgent
-    return [HotelsAgent(), BudgetAgent(), FlightsAgent(), WeatherAgent(), TrainsAgent]
+    from travel.agents.activities.agent import ActivitiesAgent
+    return [HotelsAgent(), BudgetAgent(), FlightsAgent(), WeatherAgent(), TrainsAgent(), ActivitiesAgent()]
 
 if __name__ == "__main__":
     req = TripRequest(origin="SFO", destination="Tokyo", depart_date="2026-11-12",

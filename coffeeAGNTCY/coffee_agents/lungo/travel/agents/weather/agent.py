@@ -35,18 +35,12 @@ class WeatherAgent(Negotiator):
         clashes = outdoor_on_rain_days(msg.plan.forecast, msg.plan.days)
         return 1.0 if clashes == 0 else 0.0
 
+    def needs_redo(self, msg) -> str | None:
+        """Redo my forecast if it no longer matches the trip (for example, rain was added)."""
+        if msg.plan.forecast != self.propose(msg).forecast:
+            return "updated forecast to reflect new weather conditions"
+        return None
+
     def improve(self, msg) -> tuple[Plan, str] | None:
-        """Re-propose if rain days changed; otherwise return None to OBJECT to clashes."""
-        # Check if the existing forecast matches the latest rain_days request
-        current_rain_indices = {
-            item["day"] for item in msg.plan.forecast if item.get("sky") == "rain"
-        }
-        requested_rain_indices = set(msg.request.rain_days or [])
-
-        if current_rain_indices != requested_rain_indices:
-            new_plan = self.propose(msg)
-            return new_plan, "updated forecast to reflect new weather conditions"
-
-        # If there are clashes with activities, Weather cannot edit activities itself.
-        # Returning None causes Negotiator to OBJECT so Activities agent can fix them.
+        """Weather can't move activities itself, so it returns None and OBJECTs to clashes."""
         return None
