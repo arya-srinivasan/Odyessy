@@ -3,7 +3,7 @@
 Owns plan.days: two activities per day, outdoor ones only on dry days.
 """
 
-from travel.common.data import outdoor_on_rain_days, search_activities, trip_days
+from travel.common.data import outdoor_on_rain_days, resolve_city, search_activities, trip_days
 from travel.common.models import Plan
 from travel.common.negotiator import Negotiator
 
@@ -67,8 +67,12 @@ class ActivitiesAgent(Negotiator):
     def needs_redo(self, msg) -> str | None:
         """Rebuild my schedule if it no longer fits the trip dates or the weather."""
         dates = trip_days(msg.request.depart_date, msg.request.return_date)
-        if len(msg.plan.days) != len(dates):
+        if len(msg.plan.days) != len(dates) or any(
+                d.get("date") != dates[i] for i, d in enumerate(msg.plan.days)):
             return "rebuilt the schedule to match the trip dates"
+        city = resolve_city(msg.request.destination or "")
+        if city and any(a["city"] != city["city"] for d in msg.plan.days for a in d["activities"]):
+            return f"rebuilt the schedule for {city['city']}"
         if outdoor_on_rain_days(msg.plan.forecast, msg.plan.days) > 0:
             return "moved outdoor plans off the rainy days"
         return None

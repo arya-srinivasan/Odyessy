@@ -1,4 +1,5 @@
-from travel.common.models import ChannelMsg, Plan, LogLine, TURN_ORDER, MAX_ROUNDS
+from travel.common.data import outdoor_on_rain_days, trip_days
+from travel.common.models import ChannelMsg, Plan, LogLine, TripRequest, TURN_ORDER, MAX_ROUNDS
 
 def order(participants: list[str]) -> list[str]:
     """TURN_ORDER filtered to who's actually on the channel."""
@@ -74,7 +75,7 @@ def apply_move(msg: ChannelMsg, sender: str, move: str, note: str,
 
     if is_consensus(out):
         out.type, out.next = "FINAL", ""
-        if warn := budget_note(out):   # e.g. Budget agent wasn't on the channel
+        if warn := final_warnings(out):   # e.g. Budget agent wasn't on the channel
             out.note += f" ({warn})"
     elif out.round >= MAX_ROUNDS:
         out = ranked_vote(out)
@@ -94,7 +95,44 @@ def budget_note(msg: ChannelMsg) -> str:
     if not over:
         return ""
     return (f"OVER BUDGET by ${over:,.0f}: total ${msg.plan.total(msg.request.travelers):,.0f} "
-            f"vs ${msg.request.budget_usd:,.0f} for {msg.request.travelers} traveler(s)")
+            f"vs ${msg.request.budget_usd:,.0f} for {msg.request.travelers} traveler(s), "
+            f"no cheaper option was found")
+
+
+def plan_problems(plan: Plan, request: TripRequest) -> list[str]:
+    """Ways a saved version no longer fits the request (e.g. it was made before a
+    flight was cancelled or the dates changed). Such versions never win the vote."""
+    problems = []
+    cancelled = set(request.cancelled_flights)
+    for leg in ("outbound", "return"):
+        f = (plan.flight or {}).get(leg)
+        if f and f["id"] in cancelled:
+            problems.append(f"{leg} flight {f['flight_no']} is cancelled")
+    if plan.hotel and plan.hotel.get("nights") != request.nights:
+        problems.append("hotel nights don't match the dates")
+    dates = trip_days(request.depart_date, request.return_date)
+    if plan.days and [d.get("date") for d in plan.days] != dates:
+        problems.append("activities don't match the dates")
+    if plan.forecast and [f.get("date") for f in plan.forecast] != dates:
+        problems.append("forecast doesn't match the dates")
+    if outdoor_on_rain_days(plan.forecast, plan.days):
+        problems.append("outdoor plans on a rainy day")
+    return problems
+
+
+def final_warnings(msg: ChannelMsg) -> str:
+    """Everything the traveler must know about the final plan: budget and missing pieces."""
+    r, p, who = msg.request, msg.plan, set(msg.participants)
+    warnings = [w for w in [budget_note(msg)] if w]
+    f = p.flight or {}
+    if "Flights" in who and r.origin and r.destination:
+        missing = [leg for leg in ("outbound", "return") if not f.get(leg)]
+        if missing:
+            warnings.append(f"no {' or '.join(missing)} flight available between {r.origin} and {r.destination}")
+    if "Hotels" in who and r.destination and not p.hotel:
+        warnings.append(f"no hotel booked in {r.destination}")
+    warnings += [x for x in plan_problems(p, r) if "flight" in x or "rainy" in x]
+    return "; ".join(warnings)
 
 
 def ranked_vote(msg: ChannelMsg) -> ChannelMsg:
@@ -109,10 +147,12 @@ def ranked_vote(msg: ChannelMsg) -> ChannelMsg:
         return out
 
     # Skip half-built versions (e.g. v1 has only a forecast and looks very cheap).
+    req = out.request
     need = _parts(out.plan)
     built = [v for v, p in out.versions.items() if need <= _parts(p)] or list(out.versions)
+    # Versions made before an event (cancelled flight, new dates, rain) can't win.
+    built = [v for v in built if not plan_problems(out.versions[v], req)] or built
 
-    req = out.request
     within = [v for v in built if not req.over_budget_by(out.versions[v])]
     if within:
         candidates = within
@@ -134,7 +174,7 @@ def ranked_vote(msg: ChannelMsg) -> ChannelMsg:
     out.plan = out.versions[best].model_copy(deep=True)
     out.type, out.next = "FINAL", ""
     out.note = f"No full agreement after {MAX_ROUNDS} rounds; ranked vote picked v{best}"
-    if warn := budget_note(out):
-        out.note += f". {warn}; no cheaper option was found"
+    if warn := final_warnings(out):
+        out.note += f". {warn}"
     out.history.append(LogLine(round=out.round, sender="Vote", move="", version=int(best), note=out.note))
     return out

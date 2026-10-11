@@ -23,6 +23,8 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 CHANNEL_PREFIX = "TRAVEL_CHANNEL "
 END_TOKEN = "PLAN_FINAL"  # the Gateway closes the channel when it sees this
 MAX_ROUNDS = 4  # after this many full rotations -> ranked vote
+MAX_TRIP_NIGHTS = 13  # longest trip we plan (14 days); longer -> Gateway asks for dates again
+DEFAULT_TRIP_NIGHTS = 3  # assumed when there's no return date yet (e.g. a flight-only request)
 
 # Speaking order. Weather goes first so everyone plans around the forecast.
 # Agents that aren't on the channel are simply skipped.
@@ -85,8 +87,10 @@ class TripRequest(BaseModel):
 
     @model_validator(mode="after")
     def _return_after_depart(self):
-        if self.depart_date and self.return_date and self.return_date < self.depart_date:
-            self.return_date = None
+        if self.depart_date and self.return_date:
+            nights = (date.fromisoformat(self.return_date) - date.fromisoformat(self.depart_date)).days
+            if nights < 0 or nights > MAX_TRIP_NIGHTS:
+                self.return_date = None
         return self
 
     @property
@@ -106,7 +110,7 @@ class TripRequest(BaseModel):
             n = (date.fromisoformat(self.return_date) - date.fromisoformat(self.depart_date)).days
             return max(1, n)
         except (TypeError, ValueError):
-            return 3
+            return DEFAULT_TRIP_NIGHTS
 
     def missing_fields(self) -> list[str]:
         """What the Gateway still has to ask the traveler before opening the channel."""

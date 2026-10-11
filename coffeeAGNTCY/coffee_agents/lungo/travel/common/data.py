@@ -9,6 +9,8 @@ import json
 from pathlib import Path
 from typing import Any
 
+from travel.common.models import DEFAULT_TRIP_NIGHTS, MAX_TRIP_NIGHTS
+
 # Resolve path to travel/data directory relative to this file
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 
@@ -225,8 +227,8 @@ def rail_alternatives(origin: str, dest: str) -> list[dict[str, Any]]:
 
 
 def trip_days(depart: str | None, return_date: str | None) -> list[str]:
-    """Return list of inclusive ISO dates (YYYY-MM-DD), capped at 14 days.
-    No usable depart date -> []; no usable return date -> just the depart day."""
+    """Return list of inclusive ISO dates (YYYY-MM-DD), capped at MAX_TRIP_NIGHTS + 1 days.
+    No usable depart date -> []; no usable return date -> DEFAULT_TRIP_NIGHTS nights."""
     try:
         start = date.fromisoformat(depart)
     except (TypeError, ValueError):
@@ -234,14 +236,14 @@ def trip_days(depart: str | None, return_date: str | None) -> list[str]:
     try:
         end = date.fromisoformat(return_date)
     except (TypeError, ValueError):
-        return [depart]
+        end = start + timedelta(days=DEFAULT_TRIP_NIGHTS)
 
     if end < start:
         return [depart]
 
     days = []
     curr = start
-    while curr <= end and len(days) < 14:
+    while curr <= end and len(days) <= MAX_TRIP_NIGHTS:
         days.append(curr.isoformat())
         curr += timedelta(days=1)
 

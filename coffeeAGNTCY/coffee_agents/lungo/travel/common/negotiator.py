@@ -71,5 +71,5 @@ class Negotiator:
 
 
     async def on_turn(self, msg: ChannelMsg) -> ChannelMsg:
-       return (await self.graph.ainvoke({"msg": msg}))["out"]
+        return (await self.graph.ainvoke({"msg": msg}))["out"]
     

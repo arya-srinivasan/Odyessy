@@ -7,12 +7,13 @@ against rain days and objects to weather clashes without conceding.
 from travel.common.data import mock_forecast, outdoor_on_rain_days, resolve_city, trip_days
 from travel.common.models import Plan
 from travel.common.negotiator import Negotiator
-from common.mcp_client import call_mcp_tool
-from common.stable_agent_id import stable_agent_id_for_name
 import asyncio
 
 async def live_weather(city: dict) -> str | None:
     try:
+        from common.mcp_client import call_mcp_tool  # lazy: keeps the agent importable without the SDK
+        from common.stable_agent_id import stable_agent_id_for_name
+
         text = await asyncio.wait_for(call_mcp_tool(
             topic="lungo_weather_service", tool_name="get_forecast",
             target_stable_agent_id=stable_agent_id_for_name("Weather MCP Server"),

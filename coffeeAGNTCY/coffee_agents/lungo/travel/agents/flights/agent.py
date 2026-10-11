@@ -1,5 +1,5 @@
 from travel.common.negotiator import Negotiator
-from travel.common.data import search_flights
+from travel.common.data import resolve_city, search_flights
 
 def _hours(flight: dict | None) -> float:
     if not flight:
@@ -65,6 +65,12 @@ class FlightsAgent(Negotiator):
 
     def needs_redo(self, msg):
         f, cancelled = msg.plan.flight or {}, set(msg.request.cancelled_flights)
+        r = msg.request
+        want = {"outbound": (r.origin, r.destination), "return": (r.destination, r.origin)}
+        for leg, (frm, to) in want.items():
+            a, b = resolve_city(frm or ""), resolve_city(to or "")
+            if f.get(leg) and a and b and (f[leg]["origin_city"], f[leg]["destination_city"]) != (a["city"], b["city"]):
+                return f"the trip is now {r.origin} to {r.destination}; rebooking flights"
         for leg in ("outbound", "return"):
             if f.get(leg) and f[leg]["id"] in cancelled:
                 return f"{leg} flight {f[leg]['flight_no']} was cancelled; rebooking"

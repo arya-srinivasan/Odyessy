@@ -1,6 +1,5 @@
 from travel.common.negotiator import Negotiator
-from travel.common.data import search_hotels, cheaper_hotels   # same for any other travel imports
-from travel.common.models import Plan
+from travel.common.data import cheaper_hotels, resolve_city, search_hotels   # same for any other travel imports
 
 class HotelsAgent(Negotiator):
     name = "Hotels"
@@ -15,8 +14,24 @@ class HotelsAgent(Negotiator):
         """Once I've spoken, my decision stands, even if that was 'no hotel found'."""
         return msg.plan.hotel is not None or any(l.sender == self.name for l in msg.history)
 
+    def _wrong_city(self, msg) -> bool:
+        city = resolve_city(msg.request.destination or "")
+        return bool(msg.plan.hotel and city and msg.plan.hotel["city"] != city["city"])
+
+    def needs_redo(self, msg):
+        h = msg.plan.hotel
+        if self._wrong_city(msg):
+            return f"{h['name']} is in {h['city']}, not {msg.request.destination}; rebooking"
+        if h and h.get("nights") != msg.request.nights:
+            return f"changed the stay to {msg.request.nights} nights to match the new dates"
+        return None
+
     def propose(self, msg):
         p = msg.plan.model_copy(deep=True)
+        if p.hotel and not self._wrong_city(msg):   # dates changed: keep the hotel we agreed on, just fix the nights
+            nights = msg.request.nights
+            p.hotel = dict(p.hotel, nights=nights, total_usd=p.hotel["price_per_night_usd"] * nights)
+            return p
         options = self._options(msg)
         p.hotel = options[0] if options else None
         return p
