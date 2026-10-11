@@ -107,3 +107,26 @@ def test_rain_keeps_the_train_without_a_flight_warning():
 def test_trip_email_lists_both_trains():
     r = chat("London to Paris, Nov 12 to 14")
     assert r["email"]["text"].count("Train: Eurostar") == 2
+
+
+# --- LLM notes: no move labels, no dashes ---
+
+@pytest.mark.parametrize("raw, clean", [
+    ("ACCEPT \u2013 the plan works for me.", "The plan works for me."),
+    ("OBJECT: v4 costs $3,011.", "v4 costs $3,011."),
+    ("CHANGE: I booked ANA AN626.", "I booked ANA AN626."),
+    ("Accepted; I'm happy with v6.", "Accepted; I'm happy with v6."),
+    ("Rail is greener \u2014 and cheaper.", "Rail is greener, and cheaper."),
+])
+def test_llm_notes_are_cleaned(raw, clean):
+    from travel.common.negotiator import clean_note
+    assert clean_note(raw) == clean
+
+
+def test_llm_is_told_the_concrete_part():
+    from travel.common.negotiator import my_part
+    r = chat("SFO to Tokyo Nov 12 to 16")
+    from travel.common.models import Plan
+    plan = Plan(**r["plan"])
+    assert "Shinjuku" in my_part("Hotels", plan) or "rated" in my_part("Hotels", plan)
+    assert plan.flight["outbound"]["flight_no"] in my_part("Flights", plan)

@@ -2,10 +2,42 @@ from typing import TypedDict
 from langgraph.graph import StateGraph, END
 import asyncio
 import logging
+import re
 
 from travel.common.protocol import apply_move
 from travel.common.llm import llm_text
 from travel.common.models import ChannelMsg, Plan
+
+MOVE_WORDS = {"ACCEPT": "agreed to the plan", "CHANGE": "changed the plan", "OBJECT": "objected to the plan"}
+
+
+def my_part(name: str, plan: Plan) -> str:
+    """A few concrete facts about this agent's part of the plan, so the LLM can name them."""
+    if name == "Flights" and plan.flight and plan.flight.get("outbound"):
+        f = plan.flight["outbound"]
+        return f"{f['airline']} {f['flight_no']}, ${f['price_usd']}, {f['duration_hours']}h"
+    if name == "Trains" and plan.train:
+        return f"{plan.train['operator']} {plan.train['from_city']} to {plan.train['to_city']}, ${plan.train['price_usd']}"
+    if name == "Hotels" and plan.hotel:
+        h = plan.hotel
+        return f"{h['name']} in {h['area']}, rated {h['rating']}, ${h['price_per_night_usd']}/night"
+    if name == "Weather" and plan.forecast:
+        rain = [str(d["day"] + 1) for d in plan.forecast if d.get("sky") == "rain"]
+        return f"rain on day {', '.join(rain)}" if rain else "no rain expected"
+    if name == "Activities" and plan.days:
+        names = [a["name"] for d in plan.days for a in d.get("activities", [])]
+        return f"{len(names)} activities, including {', '.join(names[:3])}"
+    return ""
+
+
+def clean_note(text: str) -> str:
+    """Drop a leading move label ("ACCEPT:", "OBJECT -") and swap dashes for commas."""
+    text = re.sub(r"^\s*(ACCEPT|CHANGE|OBJECT)\b\s*[:\-\u2013\u2014]?\s*", "", text.strip(), flags=re.I)
+    text = re.sub(r"\s*[\u2013\u2014]\s*", ", ", text)
+    if re.match(r"v\d", text):          # "v4 costs..." reads fine as is
+        return text
+    return text[:1].upper() + text[1:] if text else text
+
 
 class TurnState(TypedDict, total=False):
     msg: ChannelMsg
@@ -66,10 +98,17 @@ class Negotiator:
         msg, move, plan = s["msg"], s["move"], s["plan"]
         after = msg.model_copy(update={"plan": plan}) if plan else msg   # score what I'm leaving behind
         score = self.satisfaction(after)
+        facts = s["note"]
+        if plan is not None and (part := my_part(self.name, plan)):
+            facts += f" (what I put in the plan: {part})"
         note = await llm_text(
-            f"You are the {self.name} agent (goal: {self.goal}) planning a trip with other agents. "
-            f"Your move is {move}. Reason: {s['note']}. Say it in one short sentence to the others.",
+            f"You are the {self.name} agent (goal: {self.goal}), negotiating one trip plan with other agents. "
+            f"You just {MOVE_WORDS.get(move, move)}. Details: {facts}. "
+            "Tell the other agents in one short, plain sentence. Keep the specific names, numbers and prices. "
+            "Don't start with a label like ACCEPT, CHANGE or OBJECT, and don't use dashes.",
             fallback=s["note"])
+        if note != s["note"]:              # only tidy what the LLM wrote; LLM-off text stays as is
+            note = clean_note(note) or s["note"]
         return {"out": apply_move(msg, self.name, move, note, new_plan=plan, score=score)}
 
 
