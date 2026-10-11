@@ -298,3 +298,20 @@ def outdoor_on_rain_days(
 
     return clash_count
 
+def request_problems(request) -> list[str]:
+    """Plain-English reasons we can't plan this trip yet. An empty list means it's good to go."""
+    problems = []
+    dest = resolve_city(request.destination or "")
+    origin = resolve_city(request.origin or "")
+    if not request.destination:
+        problems.append("Where would you like to go?")
+    elif not dest:
+        problems.append(f"Sorry, I don't have travel data for '{request.destination}' yet.")
+    if not request.origin:
+        problems.append("Where are you flying from?")
+    elif not origin:
+        problems.append(f"Sorry, I don't have flights from '{request.origin}' yet.")
+    if dest and origin and not search_flights(request.origin, request.destination):
+        problems.append(f"Sorry, I don't have flights from {origin['city']} to {dest['city']} yet.")
+    return problems
+

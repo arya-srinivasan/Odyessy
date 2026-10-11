@@ -1,8 +1,12 @@
 import asyncio 
 from travel.common.models import ChannelMsg, Plan, TripRequest
 from travel.common.protocol import start_message
+from travel.common.data import request_problems
 
 async def run_local(request: TripRequest, agents: list, plan: Plan | None = None, verbose= True) -> ChannelMsg:
+    problems = request_problems(request)
+    if problems:
+        raise ValueError(" ".join(problems))  # stop at the door, before any agent runs
     msg = start_message(request, [a.name for a in agents], plan)
     by_name = {a.name : a for a in agents}
     while msg.type != "FINAL":
