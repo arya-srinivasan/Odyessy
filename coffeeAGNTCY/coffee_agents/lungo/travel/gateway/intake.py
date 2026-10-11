@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 
 from travel.common.data import CITIES
 from travel.common.llm import llm_structured
-from travel.common.models import TripRequest
+from travel.common.models import MAX_TRIP_NIGHTS, TripRequest
 
 INTAKE_SYSTEM_PROMPT = """You are a travel planning assistant parsing user requests into a TripRequest schema.
 Today's date is {today}. Dates without a year are the next time that date comes around.
@@ -73,6 +73,15 @@ def _city_mentions(text: str) -> list[tuple[int, dict]]:
             seen.add(info["city"])
             ordered.append((pos, info))
     return ordered
+
+
+def _name_at(text: str, pos: int) -> str:
+    """The city name or code that starts at pos (the word(s) _city_mentions matched)."""
+    for code, info in CITIES.items():
+        for name in (code, info["city"], *[a for a, c in CITY_ALIASES.items() if c == info["city"]]):
+            if text[pos:pos + len(name)].lower() == name.lower():
+                return name
+    return ""
 
 
 def _next_occurrence(month: int, day: int, today: date) -> date | None:
@@ -149,6 +158,10 @@ def _heuristic_extract(text: str, today: date | None = None) -> dict[str, Any]:
     # and the second the destination. A single city is the destination ("trip to Paris").
     cities = _city_mentions(text)
     origin = next((info for pos, info in cities if re.search(r"\bfrom\s*$", lower[:pos])), None)
+    if origin is None and len(cities) == 1:   # "SFO to Atlantis": the one city we know is the origin
+        pos, info = cities[0]
+        if re.match(r"\s*(?:to|-)\s", lower[pos + len(_name_at(text, pos)):]):
+            origin = info
     rest = [info for _, info in cities if info is not origin]
     if origin is None and len(rest) >= 2:
         origin = rest.pop(0)
@@ -156,6 +169,15 @@ def _heuristic_extract(text: str, today: date | None = None) -> dict[str, Any]:
         updates["origin"] = origin["airport"]
     if rest:
         updates["destination"] = rest[0]["city"]
+    elif unknown := re.search(r"\b(?:to|visit|visiting)\s+([A-Z][a-zA-Z]+(?:\s[A-Z][a-zA-Z]+)?)", text):
+        # A place we have no data for: keep it, so the Gateway can say so instead of asking again.
+        words = []
+        for w in unknown.group(1).split():
+            if w.lower()[:3] in MONTHS:   # "Atlantis Nov 12" -> "Atlantis"
+                break
+            words.append(w)
+        if words:
+            updates["destination"] = " ".join(words)
 
     depart, ret = _extract_dates(lower, today)
     length = re.search(r"\bfor (?:a |an )?(\d+|" + "|".join(NUMBER_WORDS) + r"|week)\s*(days?|nights?|weeks?)?\b", lower)
@@ -199,6 +221,8 @@ def question_for(missing: list[str]) -> str:
     """Generate a clean natural-language clarification question for missing fields."""
     if not missing:
         return ""
+    if missing == ["return date"]:
+        return f"When are you coming back? (I can plan trips of up to {MAX_TRIP_NIGHTS} nights.)"
     if len(missing) == 1:
         return f"Could you provide your {missing[0]}?"
     if len(missing) == 2:

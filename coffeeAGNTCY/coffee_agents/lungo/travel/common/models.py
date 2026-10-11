@@ -23,7 +23,7 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 CHANNEL_PREFIX = "TRAVEL_CHANNEL "
 END_TOKEN = "PLAN_FINAL"  # the Gateway closes the channel when it sees this
 MAX_ROUNDS = 4  # after this many full rotations -> ranked vote
-MAX_TRIP_NIGHTS = 13  # longest trip we plan (14 days); longer -> Gateway asks for dates again
+MAX_TRIP_NIGHTS = 14  # longest trip we plan (two weeks); longer -> Gateway asks for dates again
 DEFAULT_TRIP_NIGHTS = 3  # assumed when there's no return date yet (e.g. a flight-only request)
 
 # Speaking order. Weather goes first so everyone plans around the forecast.

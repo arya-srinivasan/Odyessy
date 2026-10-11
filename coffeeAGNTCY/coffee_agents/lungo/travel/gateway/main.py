@@ -7,6 +7,7 @@ Set TRAVEL_LOCAL_MODE=true to run all six agents in-process instead of over SLIM
 
 import asyncio
 import os
+from datetime import date
 from pathlib import Path
 from typing import Any, Literal
 
@@ -108,13 +109,30 @@ async def _negotiate(session: dict[str, Any]) -> dict[str, Any]:
         "costs": final.plan.costs(request.travelers),
         "total_usd": final.plan.total(request.travelers),
         "note": final.note,
-        "warnings": final_warnings(final),
+        "warnings": "; ".join(w for w in (final_warnings(final), _offline_warning(final.participants)) if w),
+        "offline_agents": [name for name in TURN_ORDER if name not in final.participants],
         "agents": final.participants,
         "mode": mode,
         "log": session["log"],
         "request": request.model_dump(),
         "email": await compose_trip_email(session["email"] or "", final.plan, request),
     }
+
+
+def _date_problems(request: TripRequest) -> list[str]:
+    if request.depart_date and date.fromisoformat(request.depart_date) < date.today():
+        return [f"Your departure date ({request.depart_date}) is in the past. When would you like to leave?"]
+    return []
+
+
+OWNS = {"Weather": "no forecast", "Flights": "no flights booked", "Trains": "no train options",
+        "Hotels": "no hotel booked", "Activities": "no activities planned", "Budget": "the budget wasn't checked"}
+
+
+def _offline_warning(participants: list[str]) -> str:
+    """Agents that weren't on the channel, and what the traveler is missing because of it."""
+    offline = [name for name in TURN_ORDER if name not in participants]
+    return "; ".join(f"{name} agent is offline: {OWNS[name]}" for name in offline)
 
 
 @app.get("/")
@@ -137,7 +155,7 @@ async def handle_chat(payload: ChatPayload):
 
         # 2. Check for missing essential parameters, then for things we can't plan
         missing = find_missing(session["request"])
-        problems = [] if missing else request_problems(session["request"])
+        problems = [] if missing else request_problems(session["request"]) + _date_problems(session["request"])
         if missing or problems:
             return {
                 "status": "needs_info",

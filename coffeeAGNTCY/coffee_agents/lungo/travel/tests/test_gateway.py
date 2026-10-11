@@ -141,3 +141,36 @@ def test_commit_returns_email_and_calendar():
     assert body["status"] == "success"
     assert body["mailto"].startswith("mailto:me@x.org")
     assert body["ics"].startswith("BEGIN:VCALENDAR")
+
+
+# --- Found in the demo rehearsal ---
+
+def test_unknown_destination_is_named_not_asked_for_again():
+    (r,) = call(("/chat", {"session_id": "s", "message": "SFO to Atlantis Nov 12 to 16"}))
+    assert r.json()["status"] == "needs_info"
+    assert "Atlantis" in r.json()["message"]
+
+
+def test_two_week_trip_is_planned():
+    (r,) = call(("/chat", {"session_id": "s", "message": "SFO to Paris for two weeks starting Nov 12, budget $6,000"}))
+    body = r.json()
+    assert body["status"] == "complete"
+    assert len(body["plan"]["days"]) == 15
+
+
+def test_past_dates_are_refused():
+    (r,) = call(("/chat", {"session_id": "s", "message": "SFO to Tokyo 2025-01-01 to 2025-01-05"}))
+    assert r.json()["status"] == "needs_info"
+    assert "in the past" in r.json()["message"]
+
+
+def test_offline_agent_is_reported(monkeypatch):
+    from travel.common import channel_local
+
+    every_agent = channel_local.default_agents
+    monkeypatch.setattr(channel_local, "default_agents",
+                        lambda: [a for a in every_agent() if a.name != "Hotels"])
+    (r,) = call(("/chat", {"session_id": "s", "message": "SFO to Tokyo Nov 12 to 16, $5000"}))
+    body = r.json()
+    assert body["offline_agents"] == ["Hotels"]
+    assert "Hotels agent is offline: no hotel booked" in body["warnings"]
