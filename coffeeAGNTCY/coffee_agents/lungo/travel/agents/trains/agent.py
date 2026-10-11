@@ -16,9 +16,8 @@ class TrainsAgent(Negotiator):
     floor = 0.2
 
     def has_my_part(self, msg) -> bool:
-        """Check if train options have been evaluated."""
-        # A plan is evaluated if train is set or explicitly marked as None after turn
-        return hasattr(msg.plan, "train") and msg.plan.train is not None
+        """Once I've spoken, my decision stands, even if that decision was 'no train'."""
+        return any(line.sender == self.name for line in msg.history)
 
     def propose(self, msg) -> Plan:
         """Find direct train route or scenic day trips from destination."""

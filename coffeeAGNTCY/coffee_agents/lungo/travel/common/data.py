@@ -285,8 +285,9 @@ def outdoor_on_rain_days(
                     if not act.get("indoor", False):
                         clash_count += 1
             elif isinstance(activities, dict):
-                if not activities.get("indoor", False):
-                    clash_count += 1
+                for act in activities.get("activities", []):
+                    if not act.get("indoor", False):
+                        clash_count += 1
 
     return clash_count
 
