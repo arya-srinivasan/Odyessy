@@ -16,11 +16,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
-from travel.common.data import request_problems, trip_days
+from travel.common.data import request_problems, resolve_city, trip_days
 from travel.common.models import TURN_ORDER, ChannelMsg, Plan, TripRequest
 from travel.common.protocol import final_warnings
 from travel.email_mcp.client import compose_trip_email
-from travel.gateway.intake import find_missing, question_for, update_request
+from travel.gateway.intake import find_missing, question_for, supported_cities, update_request_with_note
 
 app = FastAPI(title="TravelAgntcy Gateway")
 
@@ -119,6 +119,19 @@ async def _negotiate(session: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _place_problems(request: TripRequest) -> list[str]:
+    """Places the traveler named that we can't plan, reported even before the other questions."""
+    problems = []
+    origin, dest = resolve_city(request.origin or ""), resolve_city(request.destination or "")
+    if request.destination and not dest:
+        problems.append(f"Sorry, I don't have travel data for '{request.destination}' yet.")
+    if request.origin and not origin:
+        problems.append(f"Sorry, I don't have flights from '{request.origin}' yet.")
+    if origin and dest and origin["city"] == dest["city"]:
+        problems.append(f"You're starting in {dest['city']}; where would you like to go?")
+    return problems
+
+
 def _date_problems(request: TripRequest) -> list[str]:
     if request.depart_date and date.fromisoformat(request.depart_date) < date.today():
         return [f"Your departure date ({request.depart_date}) is in the past. When would you like to leave?"]
@@ -151,21 +164,32 @@ async def handle_chat(payload: ChatPayload):
             session["email"] = payload.email
 
         # 1. Update the structured request with information from user's message
-        session["request"] = await update_request(session["request"], payload.message)
+        session["request"], date_issue = await update_request_with_note(session["request"], payload.message)
 
         # 2. Check for missing essential parameters, then for things we can't plan
         missing = find_missing(session["request"])
-        problems = [] if missing else request_problems(session["request"]) + _date_problems(session["request"])
+        problems = _place_problems(session["request"])
+        if problems:
+            missing = []      # sort out the place first; the other questions come after
+        elif not missing:
+            problems = request_problems(session["request"]) + _date_problems(session["request"])
         if missing or problems:
             return {
                 "status": "needs_info",
-                "message": question_for(missing) if missing else " ".join(problems),
+                "message": " ".join(filter(None, [
+                    date_issue,
+                    ("When are you coming back?" if date_issue and missing == ["return date"] else question_for(missing))
+                    if missing else " ".join(problems),
+                    f"I can plan trips between {supported_cities()}." if "destination" in missing
+                    or any("don't have" in p for p in problems) else "",
+                ])),
                 "missing": missing,
                 "request": session["request"].model_dump(),
             }
 
         # 3. All required fields are present: execute the multi-agent negotiation
-        return {"status": "complete", **await _negotiate(session)}
+        result = await _negotiate(session)
+        return {"status": "complete", **({"message": date_issue} if date_issue else {}), **result}
 
 
 @app.post("/event")

@@ -6,7 +6,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from travel.common.data import CITIES
+from travel.common.data import CITIES, COUNTRY_ALIASES, resolve_city
 from travel.common.llm import llm_structured
 from travel.common.models import MAX_TRIP_NIGHTS, TripRequest
 
@@ -66,6 +66,11 @@ def _city_mentions(text: str) -> list[tuple[int, dict]]:
             flags = 0 if name.isupper() else re.IGNORECASE  # codes and aliases must be CAPS
             for m in re.finditer(rf"\b{re.escape(name)}\b", text, flags):
                 found.append((m.start(), info))
+        # "sfo to tokyo", "sf to la": a lowercase code or alias counts when it sits in a route
+        # ("from sfo", "sfo to", "to sfo").
+        for short in [code, *aliases]:
+            for m in re.finditer(rf"(?:\b(?:from|to)\s+)({short})\b|\b({short})(?=\s+(?:to|-)\s)", text, re.IGNORECASE):
+                found.append((m.start(1) if m.group(1) else m.start(2), info))
     found.sort(key=lambda f: f[0])
     seen, ordered = set(), []
     for pos, info in found:
@@ -79,7 +84,7 @@ def _name_at(text: str, pos: int) -> str:
     """The city name or code that starts at pos (the word(s) _city_mentions matched)."""
     for code, info in CITIES.items():
         for name in (code, info["city"], *[a for a, c in CITY_ALIASES.items() if c == info["city"]]):
-            if text[pos:pos + len(name)].lower() == name.lower():
+            if text[pos:pos + len(name)].lower() == name.lower() and not text[pos + len(name):pos + len(name) + 1].isalpha():
                 return name
     return ""
 
@@ -113,7 +118,12 @@ def _extract_dates(lower: str, today: date) -> tuple[str | None, str | None]:
         end_day = int(m.group(4))
         if not m.group(3) and end_day < start.day:   # "Nov 28 to 3" -> Dec 3
             end_month = start.month % 12 + 1
-        end = _next_occurrence(end_month, end_day, start)
+        # Same year unless the range wraps past December ("Dec 28 to Jan 4"). An end before
+        # the start in the same year is kept as given, so the traveler is told about it.
+        try:
+            end = date(start.year + (end_month < start.month), end_month, end_day)
+        except ValueError:
+            end = None
         return start.isoformat(), end.isoformat() if end else None
     m = re.search(rf"\b(\d{{1,2}})(?:st|nd|rd|th)?\s+(?:of\s+)?{mon}", lower)   # "15th of November", "15 Nov"
     if m:
@@ -125,6 +135,39 @@ def _extract_dates(lower: str, today: date) -> tuple[str | None, str | None]:
         end = _next_occurrence(int(m.group(3)), int(m.group(4)), start) if start and m.group(3) else None
         return (start.isoformat() if start else None), (end.isoformat() if end else None)
     return None, None
+
+
+WEEKDAYS = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
+
+
+def _relative_dates(lower: str, today: date) -> tuple[date | None, date | None]:
+    """'tomorrow', 'next week', 'this weekend', 'in 3 days', 'on Friday', 'back Sunday'."""
+    depart = ret = None
+    if re.search(r"\btoday\b", lower):
+        depart = today
+    elif re.search(r"\btomorrow\b", lower):
+        depart = today + timedelta(days=1)
+    elif re.search(r"\bnext week\b", lower):
+        depart = today + timedelta(days=7 - today.weekday())               # next Monday
+    elif m := re.search(r"\b(this|next) weekend\b", lower):
+        coming_friday = today + timedelta(days=(4 - today.weekday()) % 7 or 7)
+        if today.weekday() >= 4:   # already the weekend: "this" is now, "next" is the coming one
+            depart = today if m.group(1) == "this" else coming_friday
+        else:
+            depart = coming_friday + timedelta(days=7 if m.group(1) == "next" else 0)
+        ret = depart + timedelta(days=(6 - depart.weekday()) or 1)   # through Sunday
+    elif m := re.search(r"\bin (\d+|" + "|".join(NUMBER_WORDS) + r"|a) (days?|weeks?)\b", lower):
+        n = 1 if m.group(1) == "a" else NUMBER_WORDS.get(m.group(1)) or int(m.group(1))
+        depart = today + timedelta(days=n * (7 if m.group(2).startswith("week") else 1))
+    for m in re.finditer(r"\b(?:(back|return|returning|until|till|through)\s+(?:on\s+)?|on\s+|leaving\s+)?(" + "|".join(WEEKDAYS) + r")\b", lower):
+        is_return = bool(m.group(1))
+        base = depart if (is_return and depart) else today
+        delta = (WEEKDAYS.index(m.group(2)) - base.weekday()) % 7 or 7
+        if is_return:
+            ret = base + timedelta(days=delta)
+        elif depart is None:
+            depart = base + timedelta(days=delta)
+    return depart, ret
 
 
 def _extract_travelers(lower: str) -> int | None:
@@ -152,38 +195,123 @@ def _extract_budget(lower: str) -> float | None:
     return value * 1000 if m.group(2) else value
 
 
+GREETINGS = {"hi", "hello", "hey", "yes", "no", "yeah", "nope", "ok", "okay", "sure", "thanks", "thank",
+             "please", "help", "what", "how", "why", "when", "where", "who", "can", "could", "i", "we",
+             "the", "a", "an", "and", "or", "next", "this", "tomorrow", "today", "actually", "planning"}
+# Words that follow "to"/"from" without being a place ("to go", "from home")
+NOT_PLACES = GREETINGS | {"go", "plan", "book", "see", "visit", "travel", "fly", "be", "do", "get", "have", "make",
+                          "take", "stay", "find", "know", "help", "try", "start", "leave", "return", "come",
+                          "spend", "eat", "explore", "check", "home", "work", "here", "there", "me", "us", "you"}
+WORD = r"[^\W\d_][^\W\d_'.-]*"           # a word of letters, any alphabet (São, Zürich)
+PLACE = rf"{WORD}(?:\s+{WORD}){{0,2}}"     # up to three words
+
+
+def _trim_place(raw: str, capitalized: bool = True) -> str | None:
+    """Cut a captured place down to its name: stop at a month, a lowercase word or a filler word."""
+    words = []
+    for w in raw.split():
+        if w.lower()[:3] in MONTHS or w.lower() in GREETINGS or w.lower() in {"for", "on", "in", "with", "from", "to", "and"}:
+            break
+        if capitalized and not w[0].isupper():
+            break
+        words.append(w.strip(".,!?"))
+    return " ".join(words) or None
+
+
+def _extract_places(text: str) -> tuple[str | None, str | None, list[str]]:
+    """(origin, destination, other destinations mentioned) from free text.
+
+    Known cities come back as an airport code (origin) or city name (destination); places
+    we have no data for come back as written, so the Gateway can name them. Corrections
+    ("from Boston? no wait, from New York") take the last "from"."""
+    lower = text.lower()
+    mentions = []   # (position, end, value-as-origin, value-as-destination, known?)
+    for pos, info in _city_mentions(text):
+        name = _name_at(text, pos)
+        end = pos + len(name)
+        qualifier = re.match(rf",\s*(?:the\s+)?({PLACE})", text[end:])
+        q = _trim_place(qualifier.group(1)) if qualifier else None
+        if q and q.lower() not in COUNTRY_ALIASES.get(info["country"], set()) and not resolve_city(q):
+            label = f"{text[pos:end]}, {q}"          # "Paris, Texas" is not Paris, France
+            mentions.append((pos, end, label, label, False))
+        else:
+            mentions.append((pos, end, info["airport"], info["city"], True))
+    # Places we have no data for, after a route word ("to Rome", "from Narnia", "to the UK")
+    for m in re.finditer(rf"\b(from|to|visit|visiting)\s+(?:the\s+)?({PLACE})", text):
+        if any(p <= m.start(2) < e for p, e, *_ in mentions):
+            continue
+        place = _trim_place(m.group(2))
+        if place and not resolve_city(place):
+            mentions.append((m.start(2), m.start(2) + len(place), place, place, False))
+    # lowercase unknowns only after a travel verb ("go to sydney"), to avoid "to plan" etc.
+    for m in re.finditer(rf"\b(?:go|fly|flying|travel|traveling|travelling|trip|visit|going|heading|head)\s+to\s+({WORD})", lower):
+        if any(p <= m.start(1) < e for p, e, *_ in mentions):
+            continue
+        place = _trim_place(text[m.start(1):m.end(1)], capitalized=False)
+        if place and not resolve_city(place):
+            mentions.append((m.start(1), m.end(1), place.title(), place.title(), False))
+    # "Narnia to Tokyo": an unknown first word before a route arrow
+    lead = re.match(rf"\s*({PLACE})\s+(?:to|-)\s", text)
+    if lead and not any(p == lead.start(1) for p, *_ in mentions):
+        place = _trim_place(lead.group(1))
+        if place and not resolve_city(place):
+            mentions.append((lead.start(1), lead.start(1) + len(place), place, place, False))
+    # all lowercase, in a route with a city we know: "sf to chicago", "chicago to sf"
+    if any(known for *_, known in mentions):
+        for m in re.finditer(rf"\b(?:from|to)\s+({WORD})|^\s*({WORD})(?=\s+(?:to|-)\s)", lower):
+            start = m.start(1) if m.group(1) else m.start(2)
+            word = m.group(1) or m.group(2)
+            if any(p <= start < e for p, e, *_ in mentions) or word in NOT_PLACES or word[:3] in MONTHS:
+                continue
+            if not resolve_city(word):
+                mentions.append((start, start + len(word), word.title(), word.title(), False))
+    mentions.sort()
+    if not mentions:
+        bare = _trim_place(text.strip(" .!?"))
+        if bare and bare == text.strip(" .!?") and len(bare.split()) <= 3:
+            return None, bare, []           # a reply that is just a place name ("Rome")
+        return None, None, []
+
+    def after(word_re, pos):
+        return re.search(rf"\b(?:{word_re})\s+(?:the\s+)?$", lower[:pos])
+
+    froms = [m for m in mentions if after("from", m[0])]
+    origin = froms[-1] if froms else None
+    if origin is None:
+        followed = [m for m in mentions if re.match(r"\s*(?:to|-)\s", lower[m[1]:])]
+        if followed:
+            origin = followed[0]
+        elif len(mentions) >= 2:
+            origin = mentions[0]
+    dests = [m for m in mentions if m is not origin and m not in froms]
+    destination = dests[0] if dests else None
+    if destination is None and origin and origin[4]:
+        same = re.search(rf"\bto\s+({PLACE})", text[origin[1]:])     # "Tokyo to Tokyo"
+        city = resolve_city(_trim_place(same.group(1)) or "") if same else None
+        if city and city["airport"] == origin[2]:
+            return origin[2], city["city"], []
+    others = [m[3] for m in dests[1:] if m[3] != destination[3]]
+    return (origin[2] if origin else None), (destination[3] if destination else None), others
+
+
 def _heuristic_extract(text: str, today: date | None = None) -> dict[str, Any]:
     """Fallback extraction when LLM is offline or disabled."""
     today = today or date.today()
     updates: dict[str, Any] = {}
     lower = text.lower()
 
-    # Cities: "from X" is the origin; otherwise the first city mentioned is the origin
-    # and the second the destination. A single city is the destination ("trip to Paris").
-    cities = _city_mentions(text)
-    origin = next((info for pos, info in cities if re.search(r"\bfrom\s*$", lower[:pos])), None)
-    if origin is None and len(cities) == 1:   # "SFO to Atlantis": the one city we know is the origin
-        pos, info = cities[0]
-        if re.match(r"\s*(?:to|-)\s", lower[pos + len(_name_at(text, pos)):]):
-            origin = info
-    rest = [info for _, info in cities if info is not origin]
-    if origin is None and len(rest) >= 2:
-        origin = rest.pop(0)
+    origin, destination, others = _extract_places(text)
     if origin:
-        updates["origin"] = origin["airport"]
-    if rest:
-        updates["destination"] = rest[0]["city"]
-    elif unknown := re.search(r"\b(?:to|visit|visiting)\s+([A-Z][a-zA-Z]+(?:\s[A-Z][a-zA-Z]+)?)", text):
-        # A place we have no data for: keep it, so the Gateway can say so instead of asking again.
-        words = []
-        for w in unknown.group(1).split():
-            if w.lower()[:3] in MONTHS:   # "Atlantis Nov 12" -> "Atlantis"
-                break
-            words.append(w)
-        if words:
-            updates["destination"] = " ".join(words)
+        updates["origin"] = origin
+    if destination:
+        updates["destination"] = destination
+    if others:
+        updates["_other_destinations"] = others
 
     depart, ret = _extract_dates(lower, today)
+    rel_depart, rel_ret = _relative_dates(lower, today)
+    depart = depart or (rel_depart.isoformat() if rel_depart else None)
+    ret = ret or (rel_ret.isoformat() if rel_ret else None)
     length = re.search(r"\bfor (?:a |an )?(\d+|" + "|".join(NUMBER_WORDS) + r"|week)\s*(days?|nights?|weeks?)?\b", lower)
     if depart and not ret and length and (length.group(2) or length.group(1) == "week"):
         n = NUMBER_WORDS.get(length.group(1)) or (1 if length.group(1) == "week" else int(length.group(1)))
@@ -199,12 +327,22 @@ def _heuristic_extract(text: str, today: date | None = None) -> dict[str, Any]:
         updates["budget_usd"] = budget
     if (travelers := _extract_travelers(lower)) is not None:
         updates["travelers"] = travelers
+    else:
+        companions = r"(?:wife|husband|partner|girlfriend|boyfriend|friend|mom|dad|mother|father|son|daughter|kid|brother|sister|boss|colleague)"
+        joining = re.findall(rf"\b(?:my|our) {companions}s? (?:is|are|will be) (?:coming|joining)|\b(?:bringing|plus|with) my {companions}\b", lower)
+        if joining:
+            updates["_extra_travelers"] = len(joining)
 
     interests = [k for k, words in INTEREST_WORDS.items()
                  if any(re.search(rf"\b{w}s?\b", lower) for w in words)]
     if interests:
         updates["interests"] = interests
     return updates
+
+
+def supported_cities() -> str:
+    names = [info["city"] for info in CITIES.values()]
+    return ", ".join(names[:-1]) + f" and {names[-1]}"
 
 
 def find_missing(req: TripRequest) -> list[str]:
@@ -238,8 +376,27 @@ def question_for(missing: list[str]) -> str:
     return f"To get started, could you tell me {', '.join(parts[:-1])}, and {parts[-1]}?"
 
 
+def date_note(depart: str | None, ret: str | None) -> str:
+    """Why a pair of dates the traveler gave can't be used ('' when they're fine)."""
+    try:
+        nights = (date.fromisoformat(ret) - date.fromisoformat(depart)).days
+    except (TypeError, ValueError):
+        return ""
+    if nights < 0:
+        return f"Your return date ({ret}) is before your departure date ({depart})."
+    if nights > MAX_TRIP_NIGHTS:
+        return f"That's {nights} nights; I can plan trips of up to {MAX_TRIP_NIGHTS} nights."
+    return ""
+
+
 async def update_request(current: TripRequest, user_message: str) -> TripRequest:
     """Extract trip parameters from user message and merge non-empty fields into current."""
+    return (await update_request_with_note(current, user_message))[0]
+
+
+async def update_request_with_note(current: TripRequest, user_message: str) -> tuple[TripRequest, str]:
+    """update_request, plus a note on anything the traveler said that couldn't be used as
+    given (dates that end before they start, a trip that is too long, a second destination)."""
     messages = [
         {"role": "system", "content": INTAKE_SYSTEM_PROMPT.format(today=date.today().isoformat())},
         {"role": "user", "content": user_message},
@@ -259,6 +416,23 @@ async def update_request(current: TripRequest, user_message: str) -> TripRequest
         # Fall back to regex/heuristic extraction
         extracted_data = _heuristic_extract(user_message)
 
+    notes = []
+    others = extracted_data.pop("_other_destinations", [])
+    extra = extracted_data.pop("_extra_travelers", 0)
+    if extra and "travelers" not in extracted_data:
+        extracted_data["travelers"] = current.travelers + extra   # "my wife is coming too"
+
+    # Answering "where are you departing from?" with just a city: that's the origin, not a new
+    # destination, unless they say they're changing it ("actually Paris", "make it London").
+    new_dest = extracted_data.get("destination")
+    changing = re.search(r"\b(?:actually|instead|change|switch|rather|make it|let'?s do|how about|what about)\b|\bto\b",
+                         user_message.lower())
+    if (new_dest and not extracted_data.get("origin") and current.destination and not current.origin
+            and new_dest != current.destination and not changing):
+        known = resolve_city(new_dest)
+        extracted_data["origin"] = known["airport"] if known else new_dest
+        del extracted_data["destination"]
+
     # Answering "When are you coming back?" with one date: that date is the return, not a new departure.
     if (current.depart_date and not current.return_date
             and extracted_data.get("depart_date") and not extracted_data.get("return_date")):
@@ -273,4 +447,8 @@ async def update_request(current: TripRequest, user_message: str) -> TripRequest
             else:
                 updated_data[key] = value
 
-    return TripRequest(**updated_data)
+    notes.append(date_note(updated_data.get("depart_date"), updated_data.get("return_date")))
+    if others:
+        notes.append(f"I can plan one destination at a time, so this plan is for {updated_data['destination']}; "
+                     f"ask me about {' and '.join(others)} next.")
+    return TripRequest(**updated_data), " ".join(n for n in notes if n)

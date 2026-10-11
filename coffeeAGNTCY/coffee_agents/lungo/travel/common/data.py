@@ -30,9 +30,28 @@ TRAINS: list[dict[str, Any]] = _load_json("trains.json")
 FORECAST_PATTERN: dict[str, list[str]] = _load_json("forecast_pattern.json")
 
 
+# What may follow a city after a comma and still mean that city ("Tokyo, Japan", "Boston, MA").
+COUNTRY_ALIASES = {
+    "USA": {"usa", "us", "u.s.", "united states", "america", "california", "ca", "new york", "ny",
+            "massachusetts", "ma"},
+    "Japan": {"japan"},
+    "France": {"france"},
+    "UK": {"uk", "u.k.", "england", "united kingdom", "britain", "great britain"},
+}
+
+
 def resolve_city(text: str) -> dict[str, Any] | None:
-    """Resolve city record for 'tokyo', 'HND', 'Tokyo, Japan', 'NYC', etc."""
+    """Resolve city record for 'tokyo', 'HND', 'Tokyo, Japan', 'NYC', etc.
+    A qualifier that names somewhere else ('Paris, Texas', 'London, Ontario') is not a match."""
     if not text:
+        return None
+
+    name, _, qualifier = text.partition(",")
+    qualifier = qualifier.strip().lower()
+    if qualifier:
+        city = resolve_city(name)
+        if city and qualifier in COUNTRY_ALIASES.get(city["country"], set()):
+            return city
         return None
 
     query = text.strip().lower()

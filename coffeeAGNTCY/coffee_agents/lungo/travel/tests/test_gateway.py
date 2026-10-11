@@ -174,3 +174,115 @@ def test_offline_agent_is_reported(monkeypatch):
     body = r.json()
     assert body["offline_agents"] == ["Hotels"]
     assert "Hotels agent is offline: no hotel booked" in body["warnings"]
+
+
+# --- Found in the live stress test ---
+
+@pytest.mark.parametrize("text, expected", [
+    ("Narnia to Tokyo Nov 12 to 16", dict(origin="Narnia", destination="Tokyo")),
+    ("sfo to tokyo nov 12 to 16", dict(origin="SFO", destination="Tokyo")),
+    ("from jfk to paris", dict(origin="JFK", destination="Paris")),
+    ("I'm lax about plans, Tokyo please", dict(origin=None, destination="Tokyo")),
+])
+def test_intake_reads_unknown_origins_and_lowercase_codes(text, expected):
+    got = _heuristic_extract(text, today=date(2026, 10, 10))
+    assert {k: got.get(k) for k in expected} == expected
+
+
+def test_unknown_origin_is_named():
+    (r,) = call(("/chat", {"session_id": "s", "message": "Narnia to Tokyo Nov 12 to 16"}))
+    assert r.json()["status"] == "needs_info"
+    assert "Narnia" in r.json()["message"]
+
+
+@pytest.mark.parametrize("message, expected", [
+    ("SFO to Paris Nov 20 to Nov 10", "before your departure date"),
+    ("SFO to Paris Nov 1 to Dec 20", "That's 49 nights"),
+])
+def test_unusable_dates_are_explained(message, expected):
+    (r,) = call(("/chat", {"session_id": "s", "message": message}))
+    assert r.json()["status"] == "needs_info"
+    assert expected in r.json()["message"]
+
+
+# --- Conversation edge cases (live conversation test) ---
+
+def chat_turns(*messages, session="c"):
+    return [r.json() for r in call(*[("/chat", {"session_id": session, "message": m}) for m in messages])]
+
+
+@pytest.mark.parametrize("message, named", [
+    ("SFO to Rome Nov 12 to 16", "Rome"),
+    ("i want to go to sydney from sfo nov 12 to 16", "Sydney"),
+    ("SFO to São Paulo Nov 12 to 16", "São Paulo"),
+    ("from Zürich to London Nov 12 to 16", "Zürich"),
+    ("New York to the UK Nov 12 to 16", "UK"),
+    ("SFO to Paris, Texas Nov 12 to 16", "Paris, Texas"),
+    ("SFO to London, Ontario Nov 12 to 16", "London, Ontario"),
+    ("SFO to FCO Nov 12 to 16", "FCO"),
+])
+def test_places_we_cannot_plan_are_named_with_the_supported_list(message, named):
+    (r,) = chat_turns(message)
+    assert r["status"] == "needs_info"
+    assert named in r["message"] and "I can plan trips between" in r["message"]
+
+
+def test_a_bare_unknown_place_is_flagged_right_away():
+    _, r = chat_turns("hi", "Rome")
+    assert "don't have travel data for 'Rome'" in r["message"]
+
+
+def test_qualified_names_of_supported_cities_still_plan():
+    (r,) = chat_turns("New York, NY to Tokyo, Japan Nov 12 to 16")
+    assert r["status"] == "complete"
+    assert (r["request"]["origin"], r["request"]["destination"]) == ("JFK", "Tokyo")
+
+
+def test_same_city_both_ways_is_explained():
+    (r,) = chat_turns("Tokyo to Tokyo Nov 12 to 16")
+    assert "You're starting in Tokyo" in r["message"]
+
+
+def test_answers_one_question_at_a_time():
+    *_, last = chat_turns("hello", "Tokyo", "SFO", "November 12", "November 16")
+    assert last["status"] == "complete"
+    assert (last["request"]["origin"], last["request"]["destination"]) == ("SFO", "Tokyo")
+
+
+def test_a_correction_keeps_the_destination():
+    _, r = chat_turns("to Paris", "from Boston? no wait, from New York")
+    assert (r["request"]["origin"], r["request"]["destination"]) == ("JFK", "Paris")
+
+
+def test_people_joining_are_added():
+    *_, r = chat_turns("SFO to Kyoto Nov 12 to 16", "I'm bringing my friend", "and my brother is coming too")
+    assert r["request"]["travelers"] == 3
+
+
+def test_second_destination_is_mentioned():
+    (r,) = chat_turns("SFO to Tokyo and Kyoto Nov 12 to 16")
+    assert r["status"] == "complete" and "ask me about Kyoto next" in r["message"]
+
+
+@pytest.mark.parametrize("text, depart, ret", [
+    ("SFO to Paris next weekend", "2026-10-16", "2026-10-18"),
+    ("SFO to Tokyo tomorrow, back Wednesday", "2026-10-11", "2026-10-14"),
+    ("JFK to London in 3 weeks for 5 nights", "2026-10-31", "2026-11-05"),
+    ("LA to Tokyo leaving Friday, back Wednesday", "2026-10-16", "2026-10-21"),
+])
+def test_relative_dates(text, depart, ret):
+    got = _heuristic_extract(text, today=date(2026, 10, 10))   # a Saturday
+    assert (got.get("depart_date"), got.get("return_date")) == (depart, ret)
+
+
+@pytest.mark.parametrize("text, origin, destination", [
+    ("sf to chicago dec 1 to 5", "SFO", "Chicago"),
+    ("san francisco to chicago", "SFO", "Chicago"),
+    ("chicago to sf", "Chicago", "San Francisco"),
+    ("la to nyc nov 12 to 16", "LAX", "New York"),
+    ("new york to london dec 1st-5th", "JFK", "London"),
+    ("from home to Tokyo", None, "Tokyo"),
+])
+def test_lowercase_routes(text, origin, destination):
+    got = _heuristic_extract(text, today=date(2026, 10, 10))
+    assert (got.get("origin"), got.get("destination")) == (origin, destination)
