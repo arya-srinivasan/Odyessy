@@ -17,11 +17,16 @@ class FlightsAgent(Negotiator):
     def has_my_part(self, msg):
         return msg.plan.flight is not None
 
+    def _search(self, frm, to, msg):
+        if not frm or not to:
+            return []
+        return search_flights(frm, to, exclude_ids=msg.request.cancelled_flights, limit=10)
+
     def propose(self, msg):
         r = msg.request
         p = msg.plan.model_copy(deep=True)
-        out = search_flights(r.origin, r.destination, exclude_ids=r.cancelled_flights, limit=10)
-        back = search_flights(r.destination, r.origin, exclude_ids=r.cancelled_flights, limit=10)
+        out = self._search(r.origin, r.destination, msg)
+        back = self._search(r.destination, r.origin, msg)
         p.flight = {
             "outbound": min(out, key=lambda f: f["duration_hours"]) if out else None,
             "return": min(back, key=lambda f: f["duration_hours"]) if back else None,
@@ -32,21 +37,25 @@ class FlightsAgent(Negotiator):
         return _hours(self.propose(msg).flight)
 
     def satisfaction(self, msg): 
-        current = _hours(msg.plan.flight)
-        return self._fastest_possible(msg) / current if current else 0.0
+        current, fastest = _hours(msg.plan.flight), self._fastest_possible(msg)
+        if not fastest:
+            return 1.0   # no flights exist for this route: nothing better I could book
+        return min(1.0, fastest / current) if current else 0.0
     
 
     def improve(self, msg):
         if "Budget" not in msg.objections: 
             return None
         r, cur = msg.request, msg.plan.flight
+        if not cur or not cur.get("outbound") or not cur.get("return"):
+            return None
         max_hours = self._fastest_possible(msg) / self.threshold(msg.round)
         def cheapest_ok(options, current):
             ok = [f for f in options
                   if f["price_usd"] < current["price_usd"] and f["duration_hours"] <= max_hours / 2]
             return min(ok, key=lambda f: f["price_usd"]) if ok else current
-        out = cheapest_ok(search_flights(r.origin, r.destination, exclude_ids=r.cancelled_flights, limit=10), cur["outbound"])
-        back = cheapest_ok(search_flights(r.destination, r.origin, exclude_ids=r.cancelled_flights, limit=10), cur["return"])
+        out = cheapest_ok(self._search(r.origin, r.destination, msg), cur["outbound"])
+        back = cheapest_ok(self._search(r.destination, r.origin, msg), cur["return"])
         saved = (cur["outbound"]["price_usd"] + cur["return"]["price_usd"]) - (out["price_usd"] + back["price_usd"])
         if saved <= 0:
             return None

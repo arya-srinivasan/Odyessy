@@ -19,13 +19,15 @@ class TrainsAgent(Negotiator):
         """Once I've spoken, my decision stands, even if that decision was 'no train'."""
         return any(line.sender == self.name for line in msg.history)
 
+    def _options(self, msg) -> list[dict]:
+        if not msg.request.origin or not msg.request.destination:
+            return []
+        return rail_alternatives(msg.request.origin, msg.request.destination)
+
     def propose(self, msg) -> Plan:
         """Find direct train route or scenic day trips from destination."""
         p = msg.plan.model_copy(deep=True)
-        origin = msg.request.origin
-        dest = msg.request.destination
-
-        options = rail_alternatives(origin, dest)
+        options = self._options(msg)
         if options:
             p.train = options[0]
         else:
@@ -38,10 +40,7 @@ class TrainsAgent(Negotiator):
             return 1.0
 
         # If no rail route exists from destination or origin, agent is satisfied
-        dest = msg.request.destination
-        origin = msg.request.origin
-        options = rail_alternatives(origin, dest)
-        if not options:
+        if not self._options(msg):
             return 1.0
 
         # If rail was dropped to save budget, score reflects concession round

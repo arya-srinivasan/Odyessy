@@ -224,10 +224,17 @@ def rail_alternatives(origin: str, dest: str) -> list[dict[str, Any]]:
     ]
 
 
-def trip_days(depart: str, return_date: str) -> list[str]:
-    """Return list of inclusive ISO dates (YYYY-MM-DD), capped at 14 days."""
-    start = date.fromisoformat(depart)
-    end = date.fromisoformat(return_date)
+def trip_days(depart: str | None, return_date: str | None) -> list[str]:
+    """Return list of inclusive ISO dates (YYYY-MM-DD), capped at 14 days.
+    No usable depart date -> []; no usable return date -> just the depart day."""
+    try:
+        start = date.fromisoformat(depart)
+    except (TypeError, ValueError):
+        return []
+    try:
+        end = date.fromisoformat(return_date)
+    except (TypeError, ValueError):
+        return [depart]
 
     if end < start:
         return [depart]

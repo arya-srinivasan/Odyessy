@@ -5,9 +5,9 @@ from travel.common.a2a_server import serve
 AGENTS = {
     "weather": ("travel.agents.weather.agent", "WeatherAgent"),
     "flights": ("travel.agents.flights.agent", "FlightsAgent"),
-    #"trains": ("travel.agents.trains.agent", "TrainsAgent"),
+    "trains": ("travel.agents.trains.agent", "TrainsAgent"),
     "hotels": ("travel.agents.hotels.agent", "HotelsAgent"),
-    #"activities": ("travel.agents.activities.agent", "ActivitiesAgent"),
+    "activities": ("travel.agents.activities.agent", "ActivitiesAgent"),
     "budget": ("travel.agents.budget.agent", "BudgetAgent"),
 }
 

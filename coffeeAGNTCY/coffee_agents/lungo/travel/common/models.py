@@ -12,10 +12,11 @@ same plan. Messages go over A2A as plain text: "TRAVEL_CHANNEL {json}".
 
 from __future__ import annotations
 
+import math
 from datetime import date
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 # --- Channel constants ----------------------------------------------------
 
@@ -57,6 +58,48 @@ class TripRequest(BaseModel):
     rain_days: list[int] = Field(default_factory=list)  # 0-based trip days forced to rain
     cancelled_flights: list[str] = Field(default_factory=list)  # flight ids
 
+    @field_validator("travelers", mode="before")
+    @classmethod
+    def _at_least_one_traveler(cls, v):
+        try:
+            return max(1, int(v))
+        except (TypeError, ValueError):
+            return 1
+
+    @field_validator("budget_usd", mode="before")
+    @classmethod
+    def _positive_budget(cls, v):
+        try:
+            return float(v) if v is not None and float(v) > 0 else None
+        except (TypeError, ValueError):
+            return None
+
+    @field_validator("depart_date", "return_date", mode="before")
+    @classmethod
+    def _iso_date_or_none(cls, v):
+        """Unparseable dates become None so the Gateway asks for them again."""
+        try:
+            return date.fromisoformat(str(v).strip()).isoformat() if v else None
+        except ValueError:
+            return None
+
+    @model_validator(mode="after")
+    def _return_after_depart(self):
+        if self.depart_date and self.return_date and self.return_date < self.depart_date:
+            self.return_date = None
+        return self
+
+    @property
+    def rooms(self) -> int:
+        """Hotel rooms needed: two travelers share a room."""
+        return math.ceil(self.travelers / 2)
+
+    def over_budget_by(self, plan: "Plan") -> float:
+        """Dollars over budget (0 if within budget or no budget set)."""
+        if not self.budget_usd:
+            return 0.0
+        return max(0.0, round(plan.total(self.travelers) - self.budget_usd, 2))
+
     @property
     def nights(self) -> int:
         try:
@@ -97,11 +140,11 @@ class Plan(BaseModel):
         train = self.train["price_usd"] if self.train else 0.0
         hotel = self.hotel["price_per_night_usd"] * self.hotel.get("nights", 1) if self.hotel else 0.0
         acts = sum(a["cost_usd"] for d in self.days for a in d.get("activities", []))
-        # Hotel is per room; transport and activities are per person.
+        # Hotel is per room (two travelers share); transport and activities are per person.
         return {
             "flights": flight * travelers,
             "train": train * travelers,
-            "hotel": hotel,
+            "hotel": hotel * math.ceil(travelers / 2),
             "activities": acts * travelers,
         }
 

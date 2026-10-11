@@ -13,8 +13,13 @@ class ActivitiesAgent(Negotiator):
     goal = "great activities that fit the weather"
 
     def has_my_part(self, msg) -> bool:
-        """Have I filled in the daily activities yet?"""
-        return bool(msg.plan.days)
+        """Have I filled in the daily activities yet? (Nothing to fill without dates.)"""
+        return bool(msg.plan.days) or not trip_days(msg.request.depart_date, msg.request.return_date)
+
+    def _catalog(self, msg, interests=None) -> list[dict]:
+        if not msg.request.destination:
+            return []
+        return search_activities(msg.request.destination, interests)
 
     def _is_dry(self, msg, day: int) -> bool:
         """Is this day OK for outdoor plans? If there's no forecast yet, assume yes."""
@@ -26,7 +31,7 @@ class ActivitiesAgent(Negotiator):
     def propose(self, msg) -> Plan:
         """Pick 2 activities per day: outdoor + indoor on dry days, 2 indoor on rainy days."""
         interests = [i.lower().removesuffix("s") for i in msg.request.interests]
-        unused = search_activities(msg.request.destination, interests)  # best first
+        unused = self._catalog(msg, interests)  # best first
         dates = trip_days(msg.request.depart_date, msg.request.return_date)
 
         # Fill rainy days first: they can only use indoor activities, so they get first pick.
@@ -54,7 +59,7 @@ class ActivitiesAgent(Negotiator):
         """0..1: average rating of my picks, minus 0.5 for each outdoor activity on a rainy day."""
         picks = [a for d in msg.plan.days for a in d["activities"]]
         if not picks:
-            return 0.0
+            return 0.0 if msg.plan.days and self._catalog(msg) else 1.0   # nothing to plan
         avg = sum(a["rating"] for a in picks) / len(picks) / 5
         clashes = outdoor_on_rain_days(msg.plan.forecast, msg.plan.days)
         return max(0.0, avg - 0.5 * clashes)
@@ -69,7 +74,7 @@ class ActivitiesAgent(Negotiator):
         return None
 
     def improve(self, msg) -> tuple[Plan, str] | None:
-        """When Budget objects, make the best-value swap, preferring one that closes the whole gap."""
+        """When Budget objects, make best-value swaps (one per slot) until the gap is closed."""
         budget = msg.request.budget_usd
         if "Budget" not in msg.objections or not budget:
             return None
@@ -78,27 +83,39 @@ class ActivitiesAgent(Negotiator):
             return None  # someone earlier this round already fixed it
 
         min_rating = self.threshold(msg.round) * 5
-        in_plan = {a["id"] for d in msg.plan.days for a in d["activities"]}
-        unused = [a for a in search_activities(msg.request.destination) if a["id"] not in in_plan]
-
-        swaps = []
-        for di, day in enumerate(msg.plan.days):
-            dry = self._is_dry(msg, day["day"])
-            for slot, old in enumerate(day["activities"]):
-                for new in unused:
-                    saved = (old["cost_usd"] - new["cost_usd"]) * msg.request.travelers
-                    if saved <= 0 or new["rating"] < min_rating:
-                        continue  # not cheaper, or not good enough for me
-                    if not dry and not new["indoor"]:
-                        continue  # never put outdoor plans on a rainy day
-                    loss = max(0.0, old["rating"] - new["rating"])
-                    swaps.append({"value": saved / (loss + 0.1), "saved": saved,
-                                  "day": di, "slot": slot, "old": old, "new": new})
-        if not swaps:
-            return None
-
-        enough = [s for s in swaps if s["saved"] >= over]
-        pick = max(enough or swaps, key=lambda s: s["value"])
+        travelers = msg.request.travelers
         p = msg.plan.model_copy(deep=True)
-        p.days[pick["day"]]["activities"][pick["slot"]] = pick["new"]
-        return p, f"swapped {pick['old']['name']} for {pick['new']['name']} to save ${pick['saved']:,.0f}"
+        in_plan = {a["id"] for d in p.days for a in d["activities"]}
+        unused = [a for a in self._catalog(msg) if a["id"] not in in_plan]
+
+        # Keep making the best-value swap (one per slot) until the gap is closed.
+        done, saved_total, touched = [], 0.0, set()
+        while over > 0:
+            swaps = []
+            for di, day in enumerate(p.days):
+                dry = self._is_dry(msg, day["day"])
+                for slot, old in enumerate(day["activities"]):
+                    if (di, slot) in touched:
+                        continue
+                    for new in unused:
+                        saved = (old["cost_usd"] - new["cost_usd"]) * travelers
+                        if saved <= 0 or new["rating"] < min_rating:
+                            continue  # not cheaper, or not good enough for me
+                        if not dry and not new["indoor"]:
+                            continue  # never put outdoor plans on a rainy day
+                        loss = max(0.0, old["rating"] - new["rating"])
+                        swaps.append({"value": saved / (loss + 0.1), "saved": saved,
+                                      "day": di, "slot": slot, "old": old, "new": new})
+            if not swaps:
+                break
+            enough = [s for s in swaps if s["saved"] >= over]
+            pick = max(enough or swaps, key=lambda s: s["value"])
+            p.days[pick["day"]]["activities"][pick["slot"]] = pick["new"]
+            unused.remove(pick["new"])
+            touched.add((pick["day"], pick["slot"]))
+            over -= pick["saved"]
+            saved_total += pick["saved"]
+            done.append(f"{pick['old']['name']} -> {pick['new']['name']}")
+        if not done:
+            return None
+        return p, f"swapped {'; '.join(done)} to save ${saved_total:,.0f}"

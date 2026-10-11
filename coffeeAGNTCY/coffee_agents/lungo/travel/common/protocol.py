@@ -74,6 +74,8 @@ def apply_move(msg: ChannelMsg, sender: str, move: str, note: str,
 
     if is_consensus(out):
         out.type, out.next = "FINAL", ""
+        if warn := budget_note(out):   # e.g. Budget agent wasn't on the channel
+            out.note += f" ({warn})"
     elif out.round >= MAX_ROUNDS:
         out = ranked_vote(out)
     return out
@@ -82,23 +84,57 @@ def is_consensus(msg: ChannelMsg) -> bool:
     """set(msg.accepts) == set(msg.participants)."""
     return set(msg.accepts) == set(msg.participants)
 
+def _parts(plan: Plan) -> set[str]:
+    return {k for k in ("forecast", "flight", "hotel", "days") if getattr(plan, k)}
+
+
+def budget_note(msg: ChannelMsg) -> str:
+    """'' when within budget, else a warning the traveler must see on the final plan."""
+    over = msg.request.over_budget_by(msg.plan)
+    if not over:
+        return ""
+    return (f"OVER BUDGET by ${over:,.0f}: total ${msg.plan.total(msg.request.travelers):,.0f} "
+            f"vs ${msg.request.budget_usd:,.0f} for {msg.request.travelers} traveler(s)")
+
+
 def ranked_vote(msg: ChannelMsg) -> ChannelMsg:
-    """Pick the saved version with the highest *minimum* score across agents
-       (the fairest compromise); ties -> highest version. Set plan to it, type = FINAL,
-       note = 'No full agreement after 4 rounds; ranked vote picked vN'."""
+    """Pick a saved, fully built version. Versions within budget come first (the budget is
+       the traveler's hard limit); if none is, the cheapest wins. Among those, the highest
+       *minimum* score across agents (the fairest compromise); ties -> highest version.
+       An agent that never scored a version is assumed to feel as it did about the
+       nearest earlier version it did score. Set plan to it, type = FINAL."""
     out = msg.model_copy(deep=True)
     if not out.versions:
         out.type, out.next = "FINAL", ""
         return out
 
-    def fairness(v: str) -> tuple[float, int]:
-        s = out.scores.get(v, {})
-        worst = min(s.get(a, 0.5) for a in out.participants)
-        return (worst, int(v))                   
+    # Skip half-built versions (e.g. v1 has only a forecast and looks very cheap).
+    need = _parts(out.plan)
+    built = [v for v, p in out.versions.items() if need <= _parts(p)] or list(out.versions)
 
-    best = max(out.versions, key=fairness)
+    req = out.request
+    within = [v for v in built if not req.over_budget_by(out.versions[v])]
+    if within:
+        candidates = within
+    else:
+        cheapest = min(out.versions[v].total(req.travelers) for v in built)
+        candidates = [v for v in built if out.versions[v].total(req.travelers) <= cheapest]
+
+    def score(agent: str, v: int) -> float:
+        for earlier in range(v, -1, -1):
+            if agent in out.scores.get(str(earlier), {}):
+                return out.scores[str(earlier)][agent]
+        return 0.5
+
+    def fairness(v: str) -> tuple[float, int]:
+        worst = min((score(a, int(v)) for a in out.participants), default=0.5)
+        return (worst, int(v))
+
+    best = max(candidates, key=fairness)
     out.plan = out.versions[best].model_copy(deep=True)
     out.type, out.next = "FINAL", ""
     out.note = f"No full agreement after {MAX_ROUNDS} rounds; ranked vote picked v{best}"
+    if warn := budget_note(out):
+        out.note += f". {warn}; no cheaper option was found"
     out.history.append(LogLine(round=out.round, sender="Vote", move="", version=int(best), note=out.note))
     return out

@@ -7,7 +7,7 @@ from agntcy_app_sdk.semantic.a2a.client.factory import A2AClientFactory
 from common.a2a_transport_config import build_a2a_client_config
 
 from travel.common.a2a_server import PING, make_card
-from travel.common.models import END_TOKEN, ChannelMsg
+from travel.common.models import END_TOKEN, TURN_ORDER, ChannelMsg
 from travel.common.protocol import start_message
 
 PING_TIMEOUT = 6  # seconds per agent health check
@@ -39,8 +39,9 @@ async def _alive(card) -> bool:
     return False
 
 
-async def live_agents(agent_names: list[str], verbose: bool = True) -> list[str]:
-    names = [n.strip().capitalize() for n in agent_names]
+async def live_agents(agent_names: list[str] | None = None, verbose: bool = True) -> list[str]:
+    """Health-check agents (default: all of TURN_ORDER) and return the ones that answer."""
+    names = list(dict.fromkeys(n.strip().capitalize() for n in (agent_names or TURN_ORDER)))
     alive = []
     for n in names:                                # one at a time: concurrent pings collide in the SDK
         if await _alive(make_card(n)):
@@ -70,8 +71,9 @@ async def run_slim_stream(request, agent_names, plan=None, timeout=180):
                 yield m
 
 
-async def run_slim(request, agent_names, plan=None, verbose=True, timeout=180):
-    """Same contract as run_local: returns the last ChannelMsg (FINAL on success) or None."""
+async def run_slim(request, agent_names=None, plan=None, verbose=True, timeout=180):
+    """Same contract as run_local: returns the last ChannelMsg (FINAL on success) or None.
+    Every agent that is live and healthy joins (default: all of TURN_ORDER)."""
     names = await live_agents(agent_names, verbose)
     if not names:
         if verbose:
@@ -98,7 +100,7 @@ if __name__ == "__main__":
     from travel.common.models import TripRequest
 
     # Agents to invite: names on the command line, or these defaults.
-    agents = sys.argv[1:] or ["Weather", "Flights", "Hotels", "Budget"]
+    agents = sys.argv[1:] or TURN_ORDER
 
     req = TripRequest(
         origin="SFO",
@@ -122,3 +124,4 @@ if __name__ == "__main__":
         print(f"Channel ended without PLAN_FINAL (last move: {final.sender} {final.move})")
     else:
         print("FINAL:", final.plan.summary(final.request.travelers))
+        print("Agents:", ", ".join(final.participants), "|", final.note)

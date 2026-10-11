@@ -15,7 +15,7 @@ logger = logging.getLogger("travel.email_mcp")
 
 TOPIC = "travel_email_service"
 MAX_BODY_CHARS = 1800
-ACTIVITY_SLOTS = {"10:00", "14:00", "17:00"}
+ACTIVITY_SLOTS = ["10:00", "14:00", "17:00"]  # ordered: first activity of the day at 10:00
 
 mcp = FastMCP()
 
@@ -70,7 +70,7 @@ def plan_events(plan: Plan, request: TripRequest) -> list[dict]:
         })
 
     for d in plan.days:
-        for slot, a in zip(ACTIVITY_SLOTS, d.get("activites", [])):
+        for slot, a in zip(ACTIVITY_SLOTS, d.get("activities", [])):
             start = _at(d["date"], slot)
             events.append({
                 "title": a["name"],
@@ -118,8 +118,9 @@ def render_text(plan: Plan, request: TripRequest) -> str:
         lines.append(f"Train: {t['operator']} {t['from_city']} to {t['to_city']} at {t['depart_time']}, ${t['price_usd']:,}")
     if plan.hotel:
         h = plan.hotel
+        rooms = f", {request.rooms} rooms" if request.rooms > 1 else ""
         lines.append(f"Hotel: {h['name']} ({h['area']}), rated {h['rating']}, "
-                     f"{h.get('nights', 1)} nights at ${h['price_per_night_usd']:,}/night")
+                     f"{h.get('nights', 1)} nights at ${h['price_per_night_usd']:,}/night{rooms}")
  
     if plan.days:
         lines += ["", "Day by day:"]
@@ -130,7 +131,10 @@ def render_text(plan: Plan, request: TripRequest) -> str:
  
     total = plan.total(request.travelers)
     budget = f" of your ${request.budget_usd:,.0f} budget" if request.budget_usd else ""
-    lines += ["", f"Total: ${total:,.0f}{budget}",
+    if over := request.over_budget_by(plan):
+        budget += f" (${over:,.0f} OVER budget: no cheaper option was found)"
+    people = f" for {request.travelers} travelers" if request.travelers > 1 else ""
+    lines += ["", f"Total: ${total:,.0f}{people}{budget}",
               "Planned by six TravelAgntcy agents who negotiated it among themselves.",
               "Use Add to calendar on the trip page to put every flight, the hotel and each activity in your calendar."]
     return "\n".join(lines)

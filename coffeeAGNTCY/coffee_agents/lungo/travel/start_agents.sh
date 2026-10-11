@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
-# Usage: bash travel/start_agents.sh weather flights hotels budget
+# Usage: bash travel/start_agents.sh [weather flights trains hotels activities budget]
+# With no names, starts all six agents.
 set -u
+[ "$#" -eq 0 ] && set -- weather flights trains hotels activities budget
 cd "$(dirname "$0")/.."                      # run from the lungo folder
 set -a; source .env; set +a                  # LLM key, SLIM secret
 export PYTHONPATH=. SLIM_SERVER=localhost:46357
