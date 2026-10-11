@@ -1,0 +1,519 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Odyssey</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Overpass:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --canvas: #eef1f4;
+    --panel: #ffffff;
+    --ink: #1b2433;
+    --muted: #5b6676;
+    --rule: #dde2e8;
+    --soft: #f5f7f9;
+    /* one brand color, used sparingly */
+    --brand: #185fa5;
+    --brand-ink: #0c447c;
+    --brand-tint: #e6f1fb;
+    /* agent colors: they carry meaning, so they only appear in the agents column */
+    --weather: #2e86c1;
+    --flights: #d7263d;
+    --trains: #1b998b;
+    --hotels: #7b5ea7;
+    --activities: #e09f1f;
+    --budget: #39424e;
+    --vote: #8a94a3;
+    --over: #c0392b;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--canvas); color: var(--ink); font: 400 15px/1.5 "Overpass", system-ui, sans-serif; }
+  button, input { font: inherit; }
+  .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  :focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; }
+
+  header { background: var(--brand-ink); color: #fff; padding: 34px 28px 30px; margin-bottom: 22px; }
+  header h1 { margin: 0; font-size: clamp(48px, 7vw, 76px); line-height: .95; font-weight: 800; letter-spacing: -0.035em; }
+  header p { margin: 10px 0 0; color: #b5d4f4; font-size: 17px; }
+  .lineup { display: flex; gap: 8px; margin-top: 16px; list-style: none; padding: 0; }
+  .lineup li { width: 12px; height: 12px; border-radius: 50%; }
+
+  .notice { margin: 0 28px 14px; padding: 9px 14px; border-radius: 9px; background: var(--brand-tint); color: var(--brand-ink); font-weight: 600; display: none; }
+  .notice.show { display: block; }
+  .warn { margin: 0 0 14px; padding: 9px 12px; border-radius: 9px; background: #fdecea; color: #8a1f17; font-size: 14px; }
+  .via { font-weight: 400; font-size: 13px; color: var(--muted); margin-left: 6px; }
+
+  main {
+    display: grid; gap: 18px; padding: 0 28px 32px;
+    grid-template-columns: minmax(0, 2fr) minmax(300px, 1fr);
+    grid-template-areas: "trip agents" "chat agents";
+    grid-template-rows: auto 1fr;
+    align-items: start;
+  }
+  .trip { grid-area: trip; }
+  .chat { grid-area: chat; }
+  .agents { grid-area: agents; position: sticky; top: 16px; max-height: calc(100vh - 32px); overflow-y: auto; }
+  @media (max-width: 900px) {
+    main { grid-template-columns: 1fr; grid-template-areas: "trip" "chat" "agents"; padding: 0 16px 24px; }
+    .agents { position: static; max-height: none; }
+    header { padding-left: 16px; padding-right: 16px; }
+    .notice { margin-left: 16px; margin-right: 16px; }
+    .hero .cost { text-align: left; width: 100%; }
+    .hero h2 { font-size: 28px; }
+  }
+
+  section { background: var(--panel); border: 1px solid var(--rule); border-radius: 14px; padding: 22px; }
+  h2 { margin: 0 0 14px; font-size: 16px; font-weight: 800; }
+
+  /* --- Trip --- */
+  .hero { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; margin-bottom: 18px; }
+  .hero h2 { margin: 0; font-size: 34px; line-height: 1.1; font-weight: 800; color: var(--brand-ink); letter-spacing: -0.02em; }
+  .hero .dates { color: var(--muted); margin-top: 4px; }
+  .hero .cost { text-align: right; min-width: 200px; }
+  .hero .cost strong { font-size: 22px; font-weight: 800; }
+  .hero .cost span { color: var(--muted); }
+  .meter { height: 8px; border-radius: 4px; background: var(--soft); overflow: hidden; margin-top: 6px; }
+  .meter div { height: 100%; background: var(--brand); }
+  .meter.over div { background: var(--over); }
+  .under { color: var(--muted); font-size: 13px; margin-top: 4px; }
+
+  .legs { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; margin-bottom: 16px; }
+  .leg { padding: 12px 14px; border-radius: 10px; background: var(--soft); }
+  .leg .kind { color: var(--muted); font-size: 13px; }
+  .leg .what { font-weight: 600; }
+  .leg .detail { color: var(--muted); font-size: 13px; }
+  .leg .price { font-weight: 600; margin-top: 4px; }
+
+  .days { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin: 0; padding: 0; list-style: none; }
+  .day { padding: 12px; border-radius: 10px; border: 1px solid var(--rule); }
+  .day.rain { background: var(--brand-tint); border-color: #b5d4f4; }
+  .day .top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+  .day .num { font-weight: 800; }
+  .day .sky { font-size: 13px; color: var(--muted); }
+  .day.rain .sky { color: var(--brand-ink); font-weight: 600; }
+  .day ul { margin: 0; padding: 0; list-style: none; }
+  .day li { font-size: 14px; line-height: 1.35; margin-top: 6px; }
+  .day li .where { display: block; color: var(--muted); font-size: 12px; }
+
+  .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--rule); align-items: center; }
+  .actions[hidden] { display: none; }
+  .btn { padding: 9px 14px; border-radius: 9px; border: 1px solid var(--rule); background: var(--panel); color: var(--ink); font-weight: 600; cursor: pointer; }
+  .btn:hover { border-color: var(--muted); }
+  .btn.primary { background: var(--brand); border-color: var(--brand); color: #fff; }
+  .btn.primary:hover { background: var(--brand-ink); }
+  .btn:disabled { opacity: .45; cursor: not-allowed; }
+  .email-row { display: flex; gap: 8px; flex-basis: 100%; }
+  input[type=email], .chat input { flex: 1; min-width: 0; padding: 9px 12px; border: 1px solid var(--rule); border-radius: 9px; background: var(--panel); }
+  .hint { margin: 8px 0 0; color: var(--muted); font-size: 13px; }
+  .hint a { color: var(--brand); }
+
+  .welcome { padding: 34px 6px; }
+  .welcome h2 { font-size: 30px; line-height: 1.15; color: var(--brand-ink); margin-bottom: 8px; }
+  .welcome p { margin: 0; color: var(--muted); max-width: 52ch; }
+
+  /* --- Chat --- */
+  .messages { display: flex; flex-direction: column; gap: 8px; max-height: 220px; overflow-y: auto; margin-bottom: 12px; }
+  .bubble { padding: 8px 12px; border-radius: 12px; max-width: 80%; }
+  .bubble.you { align-self: flex-end; background: var(--brand); color: #fff; border-bottom-right-radius: 3px; }
+  .bubble.app { align-self: flex-start; background: var(--soft); border-bottom-left-radius: 3px; }
+  .chat form { display: flex; gap: 8px; }
+  .examples { margin-top: 8px; color: var(--muted); font-size: 13px; }
+  .examples button { background: none; border: 0; padding: 0; color: var(--brand); cursor: pointer; text-decoration: underline; font-size: 13px; }
+
+  /* --- Agents --- */
+  .route { list-style: none; margin: 0; padding: 0; position: relative; }
+  .route::before { content: ""; position: absolute; left: 13px; top: 6px; bottom: 6px; width: 3px; background: var(--rule); border-radius: 2px; }
+  .stop { position: relative; display: grid; grid-template-columns: 30px 1fr; gap: 10px; padding: 5px 0; }
+  .badge { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; color: #fff; font-weight: 800; font-size: 13px; border: 3px solid var(--panel); position: relative; z-index: 1; }
+  .stop .who { font-weight: 600; }
+  .move { display: inline-block; margin-left: 6px; padding: 0 6px; border-radius: 4px; font-size: 12px; font-weight: 600; border: 1px solid currentColor; }
+  .move.CHANGE { color: #9a5b00; }
+  .move.ACCEPT { color: #1b7f4b; }
+  .move.OBJECT { color: #b3261e; }
+  .stop .note { color: var(--muted); font-size: 14px; line-height: 1.4; }
+  .round { margin: 10px 0 2px 40px; font-weight: 800; font-size: 13px; color: var(--muted); }
+  .stop.enter { animation: arrive .25s ease-out both; }
+  @keyframes arrive { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+  @media (prefers-reduced-motion: reduce) { .stop.enter { animation: none; } }
+  .terminus { margin-top: 12px; padding: 12px 14px; border-radius: 10px; font-weight: 600; }
+  .terminus.agreed { background: #e7f6ee; color: #145c36; }
+  .terminus.voted { background: var(--soft); color: var(--budget); }
+  .empty { color: var(--muted); margin: 0; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Odyssey</h1>
+  <p>Six agents plan your trip together. Nobody's in charge.</p>
+  <ul class="lineup" aria-hidden="true">
+    <li style="background:var(--weather)"></li><li style="background:var(--flights)"></li><li style="background:var(--trains)"></li>
+    <li style="background:var(--hotels)"></li><li style="background:var(--activities)"></li><li style="background:#9aa5b4"></li>
+  </ul>
+</header>
+<div class="notice" id="notice" role="status"></div>
+
+<main>
+  <section class="trip" aria-label="Your trip">
+    <div id="plan">
+      <div class="welcome">
+        <h2>Where do you want to go?</h2>
+        <p>Tell Odyssey your route, dates, and budget below. Six agents will negotiate flights, hotels, trains, weather, and activities until they all agree.</p>
+      </div>
+    </div>
+    <div class="actions" id="actions" hidden>
+      <button class="btn" id="rain">Make it rain on day 2</button>
+      <button class="btn" id="cancel">Cancel my outbound flight</button>
+      <form class="email-row" id="email-form">
+        <label for="email-input" class="sr-only">Your email</label>
+        <input id="email-input" type="email" autocomplete="email" placeholder="you@example.com" required>
+        <button class="btn primary" id="email">Email me this trip</button>
+      </form>
+    </div>
+    <p class="hint" id="email-result"></p>
+  </section>
+
+  <section class="chat" aria-labelledby="chat-h">
+    <h2 id="chat-h">Plan a trip</h2>
+    <div class="messages" id="messages" aria-live="polite"></div>
+    <form id="chat-form">
+      <label for="chat-input" class="sr-only">Your message</label>
+      <input id="chat-input" autocomplete="off" placeholder="SFO to Tokyo, Nov 12 to 16, budget 2000">
+      <button class="btn primary" id="send">Plan trip</button>
+    </form>
+    <div class="examples">Try:
+      <button type="button" data-example="SFO to Tokyo, Nov 12 to 16, budget 2000, I like temples">SFO to Tokyo, Nov 12 to 16, budget 2000, I like temples</button>
+    </div>
+  </section>
+
+  <section class="agents" aria-labelledby="log-h">
+    <h2 id="log-h">How the agents agreed<span class="via" id="via"></span></h2>
+    <ol class="route" id="route"></ol>
+    <p class="empty" id="route-empty">Each agent's move shows up here as they negotiate.</p>
+    <div id="terminus"></div>
+  </section>
+</main>
+
+<script>
+const AGENTS = {
+  Weather:    { color: "var(--weather)",    letter: "W" },
+  Flights:    { color: "var(--flights)",    letter: "F" },
+  Trains:     { color: "var(--trains)",     letter: "T" },
+  Hotels:     { color: "var(--hotels)",     letter: "H" },
+  Activities: { color: "var(--activities)", letter: "A" },
+  Budget:     { color: "var(--budget)",     letter: "B" },
+  Vote:       { color: "var(--vote)",       letter: "V" },
+};
+const SKY = { sunny: "Sunny", cloudy: "Cloudy", rain: "Rain" };
+const MOCK = new URLSearchParams(location.search).has("mock");
+
+const $ = (id) => document.getElementById(id);
+let current = null;   // last plan + request from the Gateway
+let busy = false;
+let seen = 0;   // how many log lines we have already shown
+
+function sessionId() {
+  try {
+    let id = localStorage.getItem("odyssey_session");
+    if (!id) { id = crypto.randomUUID(); localStorage.setItem("odyssey_session", id); }
+    return id;
+  } catch { return (window.__sid ||= crypto.randomUUID()); }
+}
+
+// --- talking to the Gateway ---
+async function post(path, body) {
+  if (MOCK) return mockReply(path);
+  const res = await fetch(path, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ session_id: sessionId(), ...body }),
+  });
+  if (!res.ok) {
+    let detail = "";
+    try { detail = (await res.json()).detail || ""; } catch {}
+    throw new Error(detail || `The Gateway answered ${res.status}.`);
+  }
+  return res.json();
+}
+
+async function mockReply(path) {
+  const data = await (await fetch("sample_complete.json")).json();
+  if (path === "/calendar/commit") return mockEmail(data);
+  return data;
+}
+
+function notice(text) {
+  $("notice").textContent = text || "";
+  $("notice").classList.toggle("show", Boolean(text));
+}
+
+function say(who, text) {
+  const b = document.createElement("div");
+  b.className = `bubble ${who}`;
+  b.textContent = text;
+  $("messages").append(b);
+  $("messages").scrollTop = $("messages").scrollHeight;
+}
+
+function setBusy(on, label) {
+  busy = on;
+  for (const id of ["send", "rain", "cancel", "email"]) $(id).disabled = on;
+  if (current && !current.plan.flight?.outbound) $("cancel").disabled = true;
+  $("send").textContent = on ? "Planning…" : "Plan trip";
+  if (on && label) notice(label);
+  else if (!on) notice("");
+}
+
+function handle(reply) {
+  if (reply.status === "needs_info") { say("app", reply.message); return; }
+  if (reply.plan) {
+    current = { plan: reply.plan, request: reply.request || current?.request || {}, total: reply.total_usd, warnings: toList(reply.warnings) };
+    // The Gateway sends every negotiation so far; show only the one that just ran.
+    const log = reply.log || [];
+    const fresh = log.length >= seen ? log.slice(seen) : log;
+    seen = log.length;
+    showRoute(fresh);
+    $("via").textContent = reply.mode === "slim" ? "live over SLIM" : reply.mode === "local" ? "in one process" : "";
+    showPlan(current.plan, current.request);
+    $("actions").hidden = false;
+  }
+}
+
+// The Gateway sends warnings as one string joined by "; ". Accept a list too.
+function toList(w) {
+  const items = Array.isArray(w) ? w : (w || "").split("; ");
+  return items.filter(Boolean).map((x) => x[0].toUpperCase() + x.slice(1) + (x.endsWith(".") ? "" : "."));
+}
+
+// --- agents column ---
+function showRoute(log) {
+  const route = $("route");
+  route.innerHTML = "";
+  $("terminus").innerHTML = "";
+  $("route-empty").hidden = log.length > 0;
+  const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  let lastRound = -1;
+  log.forEach((line, i) => {
+    setTimeout(() => {
+      if (line.round !== lastRound) {
+        lastRound = line.round;
+        const r = document.createElement("li");
+        r.className = "round";
+        r.textContent = line.round === 0 ? "Round 1: everyone adds their part" : `Round ${line.round + 1}`;
+        route.append(r);
+      }
+      route.append(stop(line));
+      if (i === log.length - 1) showTerminus(log);
+    }, reduce ? 0 : i * 90);
+  });
+}
+
+function stop(line) {
+  const a = AGENTS[line.sender] || { color: "var(--muted)", letter: (line.sender || "?")[0] };
+  const li = document.createElement("li");
+  li.className = "stop enter";
+  const badge = document.createElement("span");
+  badge.className = "badge";
+  badge.style.background = a.color;
+  badge.textContent = a.letter;
+  badge.setAttribute("aria-hidden", "true");
+  const body = document.createElement("div");
+  const who = document.createElement("span");
+  who.className = "who";
+  who.textContent = line.sender;
+  body.append(who);
+  if (line.move) {
+    const m = document.createElement("span");
+    m.className = `move ${line.move}`;
+    m.textContent = { CHANGE: "changed", ACCEPT: "accepted", OBJECT: "objected" }[line.move] || line.move;
+    body.append(m);
+  }
+  const note = document.createElement("div");
+  note.className = "note";
+  note.textContent = line.note;   // textContent, never innerHTML: notes may come from an LLM
+  body.append(note);
+  li.append(badge, body);
+  return li;
+}
+
+function showTerminus(log) {
+  const voted = log.some((l) => l.sender === "Vote");
+  const t = document.createElement("div");
+  t.className = `terminus ${voted ? "voted" : "agreed"}`;
+  t.textContent = voted
+    ? "No full agreement after 4 rounds, so the agents held a ranked vote. The fairest plan won."
+    : `All six agents agreed on plan v${log[log.length - 1].version}. No one was in charge.`;
+  $("terminus").append(t);
+}
+
+// --- trip ---
+const money = (n) => "$" + Math.round(n).toLocaleString();
+const fmtDate = (iso) => new Date(iso + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" });
+
+function el(tag, cls, text) {
+  const e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (text != null) e.textContent = text;
+  return e;
+}
+
+function showPlan(plan, request) {
+  const travelers = request.travelers || 1;
+  const box = $("plan");
+  box.innerHTML = "";
+
+  // hero: destination, dates, total vs budget
+  const hero = el("div", "hero");
+  const left = el("div");
+  left.append(el("h2", null, request.destination || "Your trip"));
+  const days = plan.days || [];
+  if (days.length) left.append(el("div", "dates",
+      `${fmtDate(days[0].date)} to ${fmtDate(days[days.length - 1].date)}, ${days.length} days` + (travelers > 1 ? `, ${travelers} travelers` : "")));
+  hero.append(left);
+
+  const total = current?.total ?? planTotal(plan, travelers);
+  const budget = request.budget_usd;
+  const cost = el("div", "cost");
+  const line = el("div");
+  line.append(el("strong", null, money(total)));
+  if (budget) line.append(el("span", null, ` of ${money(budget)}`));
+  cost.append(line);
+  if (budget) {
+    const meter = el("div", "meter" + (total > budget ? " over" : ""));
+    meter.setAttribute("role", "img");
+    meter.setAttribute("aria-label", `${money(total)} of ${money(budget)} budget`);
+    const fill = el("div");
+    fill.style.width = Math.min(100, (total / budget) * 100) + "%";
+    meter.append(fill);
+    cost.append(meter, el("div", "under", total <= budget ? `${money(budget - total)} under budget` : `${money(total - budget)} over budget`));
+  }
+  hero.append(cost);
+  box.append(hero);
+  (current?.warnings || []).forEach((w) => box.append(el("p", "warn", w)));
+
+  // flights, train, hotel
+  const legs = el("div", "legs");
+  const f = plan.flight || {};
+  if (f.outbound) legs.append(leg("Flight out", `${f.outbound.airline} ${f.outbound.flight_no}`,
+      `${f.outbound.origin} to ${f.outbound.destination}, ${f.outbound.depart_time}, ${f.outbound.duration_hours}h`, f.outbound.price_usd * travelers));
+  if (f.return) legs.append(leg("Flight home", `${f.return.airline} ${f.return.flight_no}`,
+      `${f.return.origin} to ${f.return.destination}, ${f.return.depart_time}, ${f.return.duration_hours}h`, f.return.price_usd * travelers));
+  if (plan.train) legs.append(leg("Train", plan.train.operator,
+      `${plan.train.from_city} to ${plan.train.to_city}`, plan.train.price_usd * travelers));
+  if (plan.hotel) legs.append(leg("Hotel", plan.hotel.name,
+      `${plan.hotel.area}, rated ${plan.hotel.rating}, ${plan.hotel.nights} nights`, plan.hotel.price_per_night_usd * plan.hotel.nights));
+  box.append(legs);
+
+  // day by day
+  const list = el("ol", "days");
+  days.forEach((d) => {
+    const fc = (plan.forecast || []).find((x) => x.day === d.day) || {};
+    const li = el("li", "day" + (fc.sky === "rain" ? " rain" : ""));
+    const top = el("div", "top");
+    top.append(el("span", "num", `Day ${d.day + 1}`), el("span", "sky", SKY[fc.sky] || ""));
+    li.append(top);
+    const ul = el("ul");
+    if (!d.activities.length) ul.append(el("li", null, "Free day"));
+    d.activities.forEach((a) => {
+      const item = el("li", null, a.name);
+      item.append(el("span", "where", `${a.indoor ? "Indoor" : "Outdoor"}, ${a.cost_usd ? money(a.cost_usd) : "free"}`));
+      ul.append(item);
+    });
+    li.append(ul);
+    list.append(li);
+  });
+  box.append(list);
+}
+
+function leg(kind, what, detail, price) {
+  const e = el("div", "leg");
+  e.append(el("div", "kind", kind), el("div", "what", what), el("div", "detail", detail), el("div", "price", money(price)));
+  return e;
+}
+
+// Same math as Plan.total() in models.py: hotel per room, everything else per person.
+function planTotal(plan, travelers) {
+  let per = 0;
+  const f = plan.flight || {};
+  if (f.outbound) per += f.outbound.price_usd;
+  if (f.return) per += f.return.price_usd;
+  if (plan.train) per += plan.train.price_usd;
+  (plan.days || []).forEach((d) => d.activities.forEach((a) => (per += a.cost_usd)));
+  const hotel = plan.hotel ? plan.hotel.price_per_night_usd * (plan.hotel.nights || 1) : 0;
+  return per * travelers + hotel;
+}
+
+// --- user actions ---
+async function run(label, fn) {
+  if (busy) return;
+  setBusy(true, label);
+  try { handle(await fn()); }
+  catch (e) { say("app", `${e.message} Check that the Gateway is running, then try again.`); }
+  finally { setBusy(false); }
+}
+
+$("chat-form").addEventListener("submit", (e) => {
+  e.preventDefault();
+  const text = $("chat-input").value.trim();
+  if (!text) return;
+  say("you", text);
+  $("chat-input").value = "";
+  run("The agents are negotiating your trip…", () => post("/chat", { message: text }));
+});
+
+document.querySelectorAll("[data-example]").forEach((b) =>
+  b.addEventListener("click", () => { $("chat-input").value = b.dataset.example; $("chat-input").focus(); }));
+
+$("rain").addEventListener("click", () => {
+  say("you", "It's going to rain on day 2.");
+  run("Rain on day 2. The agents are re-planning…", () => post("/event", { type: "rain", day: 1 }));
+});
+
+$("cancel").addEventListener("click", () => {
+  const out = current.plan.flight.outbound;
+  say("you", `My outbound flight ${out.flight_no} was cancelled.`);
+  run("Flight cancelled. The agents are re-planning…", () => post("/event", { type: "cancel", flight_id: out.id }));
+});
+
+// The Email MCP prepares the email; the traveler's own mail app sends it.
+$("email-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  if (busy || !current) return;
+  const to = $("email-input").value.trim();
+  setBusy(true, "Preparing your trip email…");
+  $("email-result").textContent = "";
+  try { showEmailResult(await post("/calendar/commit", { email: to })); }
+  catch (err) { $("email-result").textContent = `${err.message} Your plan is still saved here.`; }
+  finally { setBusy(false); }
+});
+
+function showEmailResult(r) {
+  const out = $("email-result");
+  out.textContent = "Your email is ready in your mail app. Press send there. ";
+  if (r.ics) {
+    const link = el("a", null, "Download trip.ics to add every stop to your calendar.");
+    link.href = URL.createObjectURL(new Blob([r.ics], { type: "text/calendar" }));
+    link.download = "trip.ics";
+    out.append(link);
+  }
+  if (r.mailto) location.href = r.mailto;
+}
+
+// Sample mode can't run the Email MCP, so it builds a simple version of the same email.
+function mockEmail(data) {
+  const p = data.plan, r = data.request;
+  const lines = [`Your Odyssey trip to ${r.destination}`, ""];
+  p.days.forEach((d) => lines.push(`Day ${d.day + 1}: ` + d.activities.map((a) => a.name).join(", ")));
+  lines.push("", `Total: ${money(planTotal(p, r.travelers || 1))}`);
+  const subject = `Your Odyssey trip to ${r.destination}`;
+  const to = $("email-input").value.trim();
+  return { mailto: `mailto:${encodeURIComponent(to).replace("%40", "@")}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(lines.join("\n"))}` };
+}
+
+say("app", "Tell me where you're going, when, and your budget. I'll ask about anything missing.");
+setBusy(false);
+</script>
+</body>
+</html>

@@ -115,6 +115,10 @@ def _extract_dates(lower: str, today: date) -> tuple[str | None, str | None]:
             end_month = start.month % 12 + 1
         end = _next_occurrence(end_month, end_day, start)
         return start.isoformat(), end.isoformat() if end else None
+    m = re.search(rf"\b(\d{{1,2}})(?:st|nd|rd|th)?\s+(?:of\s+)?{mon}", lower)   # "15th of November", "15 Nov"
+    if m:
+        start = _next_occurrence(MONTHS[m.group(2)[:3]], int(m.group(1)), today)
+        return (start.isoformat() if start else None), None
     m = re.search(r"\b(\d{1,2})/(\d{1,2})(?:\s*(?:to|-)\s*(\d{1,2})/(\d{1,2}))?", lower)
     if m:
         start = _next_occurrence(int(m.group(1)), int(m.group(2)), today)
@@ -254,6 +258,11 @@ async def update_request(current: TripRequest, user_message: str) -> TripRequest
     else:
         # Fall back to regex/heuristic extraction
         extracted_data = _heuristic_extract(user_message)
+
+    # Answering "When are you coming back?" with one date: that date is the return, not a new departure.
+    if (current.depart_date and not current.return_date
+            and extracted_data.get("depart_date") and not extracted_data.get("return_date")):
+        extracted_data["return_date"] = extracted_data.pop("depart_date")
 
     for key, value in extracted_data.items():
         if value is not None and value != "" and value != []:
