@@ -4,7 +4,7 @@ Owns plan.train. Proposes direct rail or destination day-trips,
 and concedes by dropping the rail leg if Budget objects.
 """
 
-from travel.common.data import rail_alternatives
+from travel.common.data import search_trains
 from travel.common.models import Plan
 from travel.common.negotiator import Negotiator
 
@@ -22,7 +22,7 @@ class TrainsAgent(Negotiator):
     def _options(self, msg) -> list[dict]:
         if not msg.request.origin or not msg.request.destination:
             return []
-        return rail_alternatives(msg.request.origin, msg.request.destination)
+        return search_trains(msg.request.origin, msg.request.destination)
 
     def propose(self, msg) -> Plan:
         """Find direct train route or scenic day trips from destination."""
